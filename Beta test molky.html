@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <!--
+    Librairies servies en LOCAL (dossier libs/) plutôt que depuis les CDN.
+    URL d'origine de chaque fichier : voir libs/SOURCES.txt
+  -->
+  <meta charset="UTF-8">
+  <title>Mölkky - Test de lancer en VR</title>
+
+  <!-- A-Frame -->
+  <script src="libs/aframe.min.js"></script>
+  <!-- aframe-extras : movement-controls (déplacement joystick / clavier) -->
+  <script src="libs/aframe-extras.min.js"></script>
+  <!-- Système physique (cannon.js) : gravité, collisions, dynamic-body -->
+  <script src="libs/aframe-physics-system.min.js"></script>
+  <!--
+    A-Frame >= 1.4 enregistre son propre composant `grabbable` (hand-tracking).
+    super-hands essaie d'enregistrer le sien et plante au chargement.
+    On supprime celui d'A-Frame avant de charger super-hands.
+  -->
+  <script>delete AFRAME.components.grabbable;</script>
+  <!-- super-hands : détection du survol et du geste de saisie -->
+  <script src="libs/super-hands.min.js"></script>
+
+  <style>
+    #aide {
+      position: absolute; top: 12px; left: 12px; z-index: 10;
+      font-family: system-ui, sans-serif; font-size: 13px; line-height: 1.5;
+      background: rgba(0,0,0,.6); color: #fff; padding: 10px 14px; border-radius: 6px;
+      pointer-events: none;
+    }
+    #aide b { color: #FFC65D; }
+  </style>
+</head>
+<body>
+
+  <div id="aide">
+    <b>PC</b> — WASD / flèches : se déplacer · souris : viser la quille · <b>G</b> : prendre / lâcher · <b>clic</b> ou <b>Espace</b> : lancer<br>
+    <b>VR</b> — joystick : se déplacer · <b>grip</b> : prendre la quille · <b>relâcher le grip en balançant le bras</b> : lancer
+  </div>
+
+  <a-scene shadow="type: pcfsoft" physics="driver: local; gravity: -9.8; debug: false">
+
+    <a-assets>
+      <!--
+        Mains VR : le laser sert à viser la quille, le GRIP sert à la saisir
+        et à la lâcher (le lancer part au moment où l'on relâche le grip).
+      -->
+      <a-mixin id="main-vr"
+        raycaster="objects: .saisissable; far: 5"
+        super-hands="
+          colliderEvent: mouseenter;
+          colliderEventProperty: intersectedEl;
+          colliderEndEvent: mouseleave;
+          colliderEndEventProperty: intersectedEl;
+          grabStartButtons: gripdown;
+          grabEndButtons: gripup">
+      </a-mixin>
+    </a-assets>
+
+    <!-- ===================== LUMIÈRES ===================== -->
+
+    <a-entity
+      light="type: directional; color: #FFFFFF; intensity: 0.8; castShadow: true"
+      position="-2 4 2">
+    </a-entity>
+
+    <a-entity light="type: ambient; color: #BBBBBB; intensity: 0.5"></a-entity>
+
+    <!-- ===================== LA QUILLE À LANCER ===================== -->
+    <!--
+      Un cylindre A-Frame (axe long = Y). C'est l'entité racine qui porte son
+      propre mesh : indispensable pour que le raycaster puisse la viser.
+      Taille proche d'une vraie quille de Mölkky : Ø 6 cm, longueur 15 cm.
+      Elle est posée debout (y = 0.9 + 0.075) sur le socle.
+    -->
+    <a-cylinder
+      id="baton"
+      class="saisissable"
+      hoverable
+      baton
+      position="0 0.975 -1"
+      radius="0.03" height="0.15"
+      segments-radial="16"
+      color="#E0B070"
+      shadow="cast: true">
+    </a-cylinder>
+
+    <!-- Socle (cylindre) qui supporte la quille au départ -->
+    <a-cylinder static-body="shape: cylinder; cylinderAxis: y"
+                position="0 0.45 -1" radius="0.2" height="0.9"
+                color="#9E7B5A" shadow="cast: true; receive: true"></a-cylinder>
+
+    <!-- ===================== QUILLES CIBLES ===================== -->
+    <!-- Quilles debout, posées pile sur le sol (y = hauteur / 2) et espacées
+         pour ne pas s'interpénétrer au démarrage (le solveur les éjecterait). -->
+    <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.12"
+                position="-0.12 0.075 -4" radius="0.03" height="0.15" segments-radial="16"
+                color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
+    <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.12"
+                position="0 0.075 -4" radius="0.03" height="0.15" segments-radial="16"
+                color="#B5653A" shadow="cast: true; receive: true"></a-cylinder>
+    <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.12"
+                position="0.12 0.075 -4" radius="0.03" height="0.15" segments-radial="16"
+                color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
+    <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.12"
+                position="-0.12 0.075 -4.12" radius="0.03" height="0.15" segments-radial="16"
+                color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
+    <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.12"
+                position="0 0.075 -4.12" radius="0.03" height="0.15" segments-radial="16"
+                color="#B5653A" shadow="cast: true; receive: true"></a-cylinder>
+    <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.12"
+                position="0.12 0.075 -4.12" radius="0.03" height="0.15" segments-radial="16"
+                color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
+
+    <!-- ===================== SOL ===================== -->
+    <!-- Partie visible -->
+    <a-plane
+      position="0 0 -4"
+      rotation="-90 0 0"
+      width="30" height="30"
+      color="#7BC8A4"
+      shadow="cast: false; receive: true">
+    </a-plane>
+
+    <!--
+      Collision du sol, volontairement séparée du visuel : une boîte invisible
+      dont le dessus est exactement à y = 0 (un <a-plane static-body> serait
+      10 cm trop haut et éjecterait les objets posés dessus).
+    -->
+    <a-box static-body visible="false"
+           position="0 -0.5 -4" width="30" height="1" depth="30"></a-box>
+
+    <!-- ===================== RIG + CAMÉRA + CONTRÔLEURS ===================== -->
+
+    <a-entity id="rig" movement-controls="fly: false; speed: 0.15" position="0 0 0">
+
+      <!--
+        La caméra sert de "main" pour tester sur PC :
+        le curseur souris vise, la touche G saisit, le clic lance.
+      -->
+      <a-entity
+        id="camera"
+        camera
+        position="0 1.6 0"
+        look-controls
+        cursor="rayOrigin: mouse; fuse: false"
+        raycaster="objects: .saisissable; far: 5"
+        super-hands="
+          colliderEvent: mouseenter;
+          colliderEventProperty: intersectedEl;
+          colliderEndEvent: mouseleave;
+          colliderEndEventProperty: intersectedEl;
+          grabStartButtons: prise-debut;
+          grabEndButtons: prise-fin"
+        commandes-bureau>
+      </a-entity>
+
+      <a-entity id="leftHand" laser-controls="hand: left" mixin="main-vr"></a-entity>
+      <a-entity id="rightHand" laser-controls="hand: right" mixin="main-vr"></a-entity>
+
+    </a-entity>
+
+    <a-sky color="#ECECEC"></a-sky>
+
+  </a-scene>
+
+  <script src="Beta Test molky.js"></script>
+</body>
+</html>
