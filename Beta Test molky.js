@@ -7,7 +7,7 @@
     ========================================================================== */
 AFRAME.registerComponent('baton', {
     schema: {
-        masse: { default: 0.12 },          // masse de la quille (kg)
+        masse: { default: 0.10 },          // masse de la quille (kg)
         facteurLancer: { default: 1 },     // multiplicateur de la vitesse de la main
         vitesseMax: { default: 15 },       // vitesse de lancer maximale (m/s)
         vitessePC: { default: 7 },         // vitesse de lancer au clic (test PC, m/s)
@@ -218,5 +218,106 @@ AFRAME.registerComponent('commandes-bureau', {
         }
         if (el.sceneEl.hasLoaded) { brancherClic(); }
         else { el.sceneEl.addEventListener('loaded', brancherClic); }
+    }
+});
+
+
+/* ==========================================================================
+    Composant `quille`
+    À poser sur un <a-cylinder> pour en faire une quille de Mölkky :
+    - le haut est coupé en biseau (plan incliné de `biseau` degrés)
+    - le numéro est dessiné sur cette face inclinée
+    La collision physique reste celle d'un cylindre droit (plus stable).
+    ========================================================================== */
+AFRAME.registerComponent('quille', {
+    schema: {
+        numero: { type: 'int', default: 0 },          // 0 = pas de numéro
+        biseau: { default: 30 },                      // angle de la coupe (degrés)
+        couleurFace: { default: '#F2E2C0' },
+        couleurChiffre: { default: '#7A1F12' }
+    },
+
+    init: function () {
+        this.mesh = null;
+        this.geo = null;
+        this.face = null;
+        this.surMesh = this.surMesh.bind(this);
+
+        var mesh = this.el.getObject3D('mesh');
+        if (mesh) { this.construire(mesh); }
+        else { this.el.addEventListener('object3dset', this.surMesh); }
+    },
+
+    // Le mesh du <a-cylinder> est créé par le composant geometry : on attend qu'il existe
+    surMesh: function (evt) {
+        if (evt.detail.type === 'mesh' && !this.mesh) { this.construire(evt.detail.object); }
+    },
+
+    construire: function (mesh) {
+        this.mesh = mesh;
+        var d = this.data;
+        var dim = this.el.getAttribute('geometry');
+        var r = dim.radius, h = dim.height;
+        var a = THREE.MathUtils.degToRad(d.biseau);
+        var chute = 2 * r * Math.tan(a);   // différence de hauteur entre les deux bords
+
+        // 1) BISEAU. A-Frame partage une même géométrie entre toutes les entités
+        // identiques : on travaille sur une COPIE, sinon on déformerait toutes les quilles.
+        var g = mesh.geometry.clone();
+        var pos = g.attributes.position;
+        for (var i = 0; i < pos.count; i++) {
+            // sommets du dessus (anneau + centre du disque) : on les fait descendre
+            // linéairement le long de x -> le dessus devient un plan incliné
+            if (pos.getY(i) > h / 2 - 1e-5) {
+                pos.setY(i, h / 2 - chute * (pos.getX(i) + r) / (2 * r));
+            }
+        }
+        pos.needsUpdate = true;
+        g.computeVertexNormals();
+        mesh.geometry = g;
+        this.geo = g;
+
+        // 2) NUMÉRO, dessiné sur un canvas puis collé sur la face inclinée
+        if (d.numero > 0) {
+            var canvas = document.createElement('canvas');
+            canvas.width = canvas.height = 128;
+            var c = canvas.getContext('2d');
+            c.fillStyle = d.couleurFace;
+            c.fillRect(0, 0, 128, 128);
+            c.strokeStyle = d.couleurChiffre;
+            c.lineWidth = 6;
+            c.beginPath(); c.arc(64, 64, 58, 0, Math.PI * 2); c.stroke();
+            c.fillStyle = d.couleurChiffre;
+            c.font = 'bold 76px sans-serif';
+            c.textAlign = 'center';
+            c.textBaseline = 'middle';
+            c.fillText(String(d.numero), 64, 70);
+
+            var tex = new THREE.CanvasTexture(canvas);
+            if (THREE.SRGBColorSpace) { tex.colorSpace = THREE.SRGBColorSpace; }
+            else { tex.encoding = THREE.sRGBEncoding; }
+
+            var disque = new THREE.Mesh(
+                new THREE.CircleGeometry(r * 0.85, 24),
+                new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 })
+            );
+            disque.rotation.x = -Math.PI / 2;   // à plat (normale vers +Y)
+
+            // le groupe incline le disque comme le biseau et le place au centre de la face
+            var groupe = new THREE.Group();
+            groupe.add(disque);
+            groupe.rotation.z = -a;
+            var normale = new THREE.Vector3(Math.sin(a), Math.cos(a), 0);
+            groupe.position.set(0, h / 2 - chute / 2, 0)
+                .addScaledVector(normale, 0.0005);   // 0,5 mm au-dessus : évite le z-fighting
+            this.el.object3D.add(groupe);
+            this.face = groupe;
+        }
+    },
+
+    remove: function () {
+        this.el.removeEventListener('object3dset', this.surMesh);
+        if (this.geo) { this.geo.dispose(); }
+        if (this.face) { this.el.object3D.remove(this.face); }
     }
 });

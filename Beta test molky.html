@@ -79,7 +79,7 @@
       id="baton"
       class="saisissable"
       hoverable
-      baton
+      baton 
       position="0 0.975 -1"
       radius="0.03" height="0.15"
       segments-radial="16"
@@ -96,22 +96,22 @@
     <!-- Quilles debout, posées pile sur le sol (y = hauteur / 2) et espacées
          pour ne pas s'interpénétrer au démarrage (le solveur les éjecterait). -->
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.12"
-                position="-0.12 0.075 -4" radius="0.03" height="0.15" segments-radial="16"
+                quille="numero: 7" position="-0.12 0.075 -4" radius="0.03" height="0.15" segments-radial="16"
                 color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.12"
-                position="0 0.075 -4" radius="0.03" height="0.15" segments-radial="16"
+                quille="numero: 9" position="0 0.075 -4" radius="0.03" height="0.15" segments-radial="16"
                 color="#B5653A" shadow="cast: true; receive: true"></a-cylinder>
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.12"
-                position="0.12 0.075 -4" radius="0.03" height="0.15" segments-radial="16"
+                quille="numero: 8" position="0.12 0.075 -4" radius="0.03" height="0.15" segments-radial="16"
                 color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.12"
-                position="-0.12 0.075 -4.12" radius="0.03" height="0.15" segments-radial="16"
+                quille="numero: 7" position="-0.12 0.075 -3.88" radius="0.03" height="0.15" segments-radial="16"
                 color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.12"
-                position="0 0.075 -4.12" radius="0.03" height="0.15" segments-radial="16"
+                quille="numero: 9" position="0 0.075 -3.88" radius="0.03" height="0.15" segments-radial="16"
                 color="#B5653A" shadow="cast: true; receive: true"></a-cylinder>
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.12"
-                position="0.12 0.075 -4.12" radius="0.03" height="0.15" segments-radial="16"
+                quille="numero: 8" position="0.12 0.075 -3.88" radius="0.03" height="0.15" segments-radial="16"
                 color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
 
     <!-- ===================== SOL ===================== -->
