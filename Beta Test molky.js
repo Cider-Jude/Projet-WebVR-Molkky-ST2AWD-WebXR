@@ -8,10 +8,12 @@
 
 AFRAME.registerComponent('baton', {
     schema: {
-        masse: { default: 0.10 },          // masse de la quille (kg)
+        masse: { default: 0.13 },          // masse de la quille (kg)
         facteurLancer: { default: 1 },     // multiplicateur de la vitesse de la main
         vitesseMax: { default: 15 },       // vitesse de lancer maximale (m/s)
         vitessePC: { default: 7 },         // vitesse de lancer au clic (test PC, m/s)
+
+        delaiRetour: { default: 3000 },      // délai avant le retour sur le socle (ms)
 
         // Décalage de la quille par rapport à l'origine du rayon du contrôleur
         offsetPosition: {
@@ -43,6 +45,14 @@ AFRAME.registerComponent('baton', {
         this.porteur = null;
         this.vitesseImposee = null;
         this.historique = [];
+
+        var p = this.el.getAttribute('position');
+        var r = this.el.getAttribute('rotation');
+        this.posInit = { x: p.x, y: p.y, z: p.z };
+        this.rotInit = { x: r.x, y: r.y, z: r.z };
+
+        this.minuteur = null;
+        this.retourner = this.retourner.bind(this);
 
         this.quat = new THREE.Quaternion();
         this.posMonde = new THREE.Vector3();
@@ -117,6 +127,8 @@ AFRAME.registerComponent('baton', {
         var main = evt.detail.hand;
 
         this.porteur = main;
+        clearTimeout(this.minuteur);
+        this.minuteur = null;
         this.historique = [];
 
         // Plus de physique tant que la quille est tenue
@@ -317,6 +329,29 @@ AFRAME.registerComponent('baton', {
         );
 
         this.el.sceneEl.emit('baton-lache');
+        this.minuteur = setTimeout(this.retourner, this.data.delaiRetour);
+    },
+
+    retourner: function () {
+        this.minuteur = null;
+
+        // si le joueur l'a reprise entre-temps, on ne fait rien
+        if (this.porteur) { return; }
+
+        // plus de physique : la quille repart de zéro sur le socle
+        this.el.removeAttribute('dynamic-body');
+        this.el.setAttribute('position', {
+            x: this.posInit.x, y: this.posInit.y, z: this.posInit.z
+        });
+        this.el.setAttribute('rotation', {
+            x: this.rotInit.x, y: this.rotInit.y, z: this.rotInit.z
+        });
+
+        this.el.sceneEl.emit('baton-retour');
+    },
+
+    remove: function () {
+        clearTimeout(this.minuteur);
     }
 });
 
