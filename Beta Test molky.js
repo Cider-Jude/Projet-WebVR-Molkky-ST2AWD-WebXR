@@ -6,6 +6,7 @@
       => la quille part avec le mouvement du bras (lancer)
     ========================================================================== */
 
+    
 AFRAME.registerComponent('baton', {
     schema: {
         masse: { default: 0.13 },          // masse de la quille (kg)
@@ -53,6 +54,7 @@ AFRAME.registerComponent('baton', {
 
         this.minuteur = null;
         this.retourner = this.retourner.bind(this);
+        this.finDuDelai = this.finDuDelai.bind(this);
 
         this.quat = new THREE.Quaternion();
         this.posMonde = new THREE.Vector3();
@@ -329,7 +331,18 @@ AFRAME.registerComponent('baton', {
         );
 
         this.el.sceneEl.emit('baton-lache');
-        this.minuteur = setTimeout(this.retourner, this.data.delaiRetour);
+        this.minuteur = setTimeout(this.finDuDelai, this.data.delaiRetour);
+    },
+
+    finDuDelai: function () {
+        this.minuteur = null;
+        if (this.porteur) { return; }           // reprise en main entre-temps : on ne fait rien
+
+        var self = this;
+        evaluerLancer(function (resultat) {
+            self.retourner();                    // le bâton revient une fois le relevage terminé
+            self.el.sceneEl.emit('lancer-termine', resultat);
+        });
     },
 
     retourner: function () {
@@ -416,6 +429,121 @@ AFRAME.registerComponent('commandes-bureau', {
 });
 
 
+var QUILLES = [];                 // registre partagé : toutes les quilles de la scène
+var RELEVAGE = {
+    seuilChute: 30,               // inclinaison (°) à partir de laquelle une quille est « tombée »
+    marge: 0.01,                  // espace mini entre deux quilles relevées (m)
+    demiTerrain: 14,              // au-delà, la quille revient à sa place d'origine (m)
+    delaiMax: 5000,               // attente maximale de l'immobilité (ms)
+    enCours: false,
+    callbacks: []          // fonctions à prévenir quand le relevage est terminé
+};
+
+// Tombée = l'axe de la quille penche de plus de seuilChute degrés par rapport à la verticale
+function quilleEstTombee(el) {
+    var haut = new THREE.Vector3(0, 1, 0).applyQuaternion(el.object3D.quaternion);
+    return haut.y < Math.cos(THREE.MathUtils.degToRad(RELEVAGE.seuilChute));
+}
+
+function quilleAuRepos(el) {
+    var b = el.body;
+    return !b || (b.velocity.length() < 0.05 && b.angularVelocity.length() < 0.15);
+}
+
+// Évalue le tir qui vient d'avoir lieu et appelle callback({ touche, quilles })
+//  - rien ne bouge et rien n'est tombé : tir raté, callback immédiat
+//  - sinon : on attend l'immobilité, on relève, puis callback
+function evaluerLancer(callback) {
+    var concerne = QUILLES.some(function (q) {
+        return quilleEstTombee(q.el) || !quilleAuRepos(q.el);
+    });
+    if (!concerne) { callback({ touche: false, quilles: [] }); return; }
+
+    RELEVAGE.callbacks.push(callback);
+    if (RELEVAGE.enCours) { return; }       // un relevage est déjà en attente : il préviendra aussi celui-ci
+    RELEVAGE.enCours = true;
+
+    var debut = Date.now(), calmes = 0;
+    (function verifier() {
+        var repos = QUILLES.every(function (q) { return quilleAuRepos(q.el); });
+        calmes = repos ? calmes + 1 : 0;
+        if (calmes >= 5 || Date.now() - debut > RELEVAGE.delaiMax) {
+            var relevees = releverLesQuilles();
+            RELEVAGE.enCours = false;
+            var cbs = RELEVAGE.callbacks;
+            RELEVAGE.callbacks = [];
+            cbs.forEach(function (cb) {
+                cb({ touche: relevees.length > 0, quilles: relevees });
+            });
+        } else {
+            setTimeout(verifier, 100);
+        }
+    })();
+}
+
+function releverLesQuilles() {
+    // 1) Où va chaque quille ? Debout : elle reste où elle est.
+    //    Tombée : sous le bout biseauté (axe +Y local), en ne gardant que x et z.
+    var pts = QUILLES.map(function (q) {
+        var el = q.el, dim = el.getAttribute('geometry');
+        var tombee = quilleEstTombee(el), x, z;
+        if (tombee) {
+            el.object3D.updateMatrixWorld(true);
+            var bout = el.object3D.localToWorld(new THREE.Vector3(0, dim.height / 2, 0));
+            x = bout.x; z = bout.z;
+            // sortie du terrain : retour à la place d'origine
+            if (Math.abs(x) > RELEVAGE.demiTerrain || Math.abs(z + 4) > RELEVAGE.demiTerrain) {
+                x = q.posInit.x; z = q.posInit.z;
+            }
+        } else {
+            x = el.object3D.position.x; z = el.object3D.position.z;
+        }
+        return { el: el, y: dim.height / 2, x: x, z: z, fixe: !tombee };
+    });
+
+    // 2) Anti-chevauchement : les quilles relevées sont écartées des voisines
+    //    (les quilles restées debout ne bougent pas)
+    var ecartMin = 2 * QUILLES[0].el.getAttribute('geometry').radius + RELEVAGE.marge;
+    for (var it = 0; it < 80; it++) {
+        var bouge = false;
+        for (var i = 0; i < pts.length; i++) {
+            for (var j = i + 1; j < pts.length; j++) {
+                var A = pts[i], B = pts[j];
+                if (A.fixe && B.fixe) { continue; }
+                var dx = B.x - A.x, dz = B.z - A.z, d = Math.sqrt(dx * dx + dz * dz);
+                if (d >= ecartMin) { continue; }
+                var nx = d > 1e-4 ? dx / d : 1, nz = d > 1e-4 ? dz / d : 0, rec = ecartMin - d;
+                var pA = A.fixe ? 0 : (B.fixe ? 1 : 0.5), pB = 1 - pA;
+                A.x -= nx * rec * pA; A.z -= nz * rec * pA;
+                B.x += nx * rec * pB; B.z += nz * rec * pB;
+                bouge = true;
+            }
+        }
+        if (!bouge) { break; }
+    }
+
+    // 3) Téléportation : entité ET corps physique, debout, vitesses nulles
+    var relevees = [];
+    pts.forEach(function (p) {
+        if (p.fixe) { return; }
+        relevees.push(p.el);
+        p.el.object3D.position.set(p.x, p.y, p.z);
+        p.el.object3D.quaternion.set(0, 0, 0, 1);
+        var b = p.el.body;
+        if (b) {
+            b.position.set(p.x, p.y, p.z);
+            b.quaternion.set(0, 0, 0, 1);
+            b.velocity.set(0, 0, 0);
+            b.angularVelocity.set(0, 0, 0);
+            b.aabbNeedsUpdate = true;
+        }
+    });
+
+    // utile pour la suite (comptage des points)
+    document.querySelector('a-scene').emit('quilles-relevees', { quilles: relevees });
+    return relevees;
+}
+
 /* ==========================================================================
     Composant `quille`
 
@@ -486,10 +614,19 @@ AFRAME.registerComponent('quille', {
             this.construireSiPossible
         );
 
+        // Seules les cibles sont relevées (pas la quille de lancer)
+        if (this.el.classList.contains('quille')) {
+            var p = this.el.getAttribute('position');
+            this.posInit = { x: p.x, z: p.z };      // pour le retour si la quille sort du terrain
+            QUILLES.push(this);
+        }
+
         // Petit filet de sécurité pour les cas où le body
         // est déjà présent au moment de l'initialisation.
         setTimeout(this.construireSiPossible, 0);
     },
+
+    
 
     surMesh: function (evt) {
         if (
@@ -929,6 +1066,9 @@ AFRAME.registerComponent('quille', {
             'object3dset',
             this.surMesh
         );
+
+        var k = QUILLES.indexOf(this);
+        if (k >= 0) { QUILLES.splice(k, 1); }
 
         this.el.removeEventListener(
             'body-loaded',
