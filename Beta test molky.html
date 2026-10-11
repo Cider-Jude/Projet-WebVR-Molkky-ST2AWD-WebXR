@@ -40,22 +40,16 @@
     <b>VR</b> — joystick : se déplacer · <b>grip</b> : prendre la quille · <b>relâcher le grip en balançant le bras</b> : lancer
   </div>
 
-  <a-scene shadow="type: pcfsoft" physics="driver: local; gravity: -9.8; debug: false">
+  <a-scene shadow="type: pcfsoft" physics="driver: local; gravity: -9.8; debug: false;">
 
     <a-assets>
       <!--
-        Mains VR : le laser sert à viser la quille, le GRIP sert à la saisir
-        et à la lâcher (le lancer part au moment où l'on relâche le grip).
+        Mains VR : le grip se via une sphere, 
+        quand un objet "saisissable" rentre dans cette sphere, le joueur peut le saisir en appyant sur le bouton grip.
       -->
       <a-mixin id="main-vr"
-        raycaster="objects: .saisissable; far: 5"
-        super-hands="
-          colliderEvent: mouseenter;
-          colliderEventProperty: intersectedEl;
-          colliderEndEvent: mouseleave;
-          colliderEndEventProperty: intersectedEl;
-          grabStartButtons: gripdown;
-          grabEndButtons: gripup">
+        sphere-collider="objects: .saisissable; radius: 0.04"
+        super-hands="grabStartButtons: gripdown; grabEndButtons: gripup">
       </a-mixin>
     </a-assets>
 
@@ -154,7 +148,7 @@
       dont le dessus est exactement à y = 0 (un <a-plane static-body> serait
       10 cm trop haut et éjecterait les objets posés dessus).
     -->
-    <a-box static-body visible="false"
+    <a-box static-body visible="false" sol-absorbant="friction: 0.8; restitution: 0.05"
            position="0 -0.5 -4" width="30" height="1" depth="30"></a-box>
 
     <!-- ===================== RIG + CAMÉRA + CONTRÔLEURS ===================== -->
@@ -182,8 +176,8 @@
         commandes-bureau>
       </a-entity>
 
-      <a-entity id="leftHand" laser-controls="hand: left" mixin="main-vr"></a-entity>
-      <a-entity id="rightHand" laser-controls="hand: right" mixin="main-vr"></a-entity>
+      <a-entity id="leftHand" hand-controls="hand: left" mixin="main-vr"></a-entity>
+      <a-entity id="rightHand" hand-controls="hand: right" mixin="main-vr"></a-entity>
 
     </a-entity>
 

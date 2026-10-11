@@ -1,4 +1,39 @@
 /* ==========================================================================
+    Composant `sol absorbant`
+    - modification du rebond et de la friction du sol pour rendre la simulation du lancée du bâton plus réaliste et moins frustrant
+    ========================================================================== */
+AFRAME.registerComponent('sol-absorbant', {
+    schema: {
+        friction: { default: 0.8 },       // 0 = glisse comme sur la glace, 1 = accroche fort
+        restitution: { default: 0.05 }    // 0 = aucun rebond, 1 = rebond parfait
+    },
+
+    init: function () {
+        this.appliquer = this.appliquer.bind(this);
+        this.el.addEventListener('body-loaded', this.appliquer, { once: true });
+    },
+
+    appliquer: function () {
+        var d = this.data;
+        var sys = this.el.sceneEl.systems.physics;
+        var s = sys.data;
+
+        // matériau propre au sol + règles de contact avec le matériau des quilles
+        sys.driver.addMaterial({ name: 'sol' });
+        sys.driver.addContactMaterial('sol', 'defaultMaterial', {
+            friction: d.friction,
+            restitution: d.restitution,
+            contactEquationStiffness: s.contactEquationStiffness,
+            contactEquationRelaxation: s.contactEquationRelaxation,
+            frictionEquationStiffness: s.frictionEquationStiffness,
+            frictionEquationRegularization: s.frictionEquationRegularization
+        });
+        this.el.body.material = sys.driver.getMaterial('sol');
+    }
+});
+
+
+/* ==========================================================================
     Composant `baton`
     - se fait saisir par super-hands (grab-start / grab-end)
     - s'accroche à la main pendant qu'il le tient
