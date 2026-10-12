@@ -1,0 +1,11 @@
+Model Information:
+* title:	Board School
+* source:	https://sketchfab.com/3d-models/board-school-9424811b5b9a4d788973807acef91ca4
+* author:	adventurer (https://sketchfab.com/ahmagh2e)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Board School" (https://sketchfab.com/3d-models/board-school-9424811b5b9a4d788973807acef91ca4) by adventurer (https://sketchfab.com/ahmagh2e) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

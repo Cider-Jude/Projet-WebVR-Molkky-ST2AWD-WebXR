@@ -49,7 +49,7 @@ AFRAME.registerComponent('baton', {
         vitesseMax: { default: 15 },       // vitesse de lancer maximale (m/s)
         vitessePC: { default: 7 },         // vitesse de lancer au clic (test PC, m/s)
 
-        delaiRetour: { default: 3000 },      // délai avant le retour sur le socle (ms)
+        delaiRetour: { default: 1500 },      // délai avant le retour sur le socle (ms)
 
         // Décalage de la quille par rapport à l'origine du rayon du contrôleur
         offsetPosition: {
