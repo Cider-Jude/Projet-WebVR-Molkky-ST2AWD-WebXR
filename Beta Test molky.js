@@ -148,7 +148,6 @@ scene.addEventListener('lancer-termine', function (e) {
     rates = e.detail.touche ? 0 : rates + 1;
     lances+=1;
     UpdateScore(numeros);
-
 });
 
 
@@ -1177,7 +1176,7 @@ AFRAME.registerComponent('tableau-score', {
     schema: {
         largeur: { default: 1.2 },        // taille du plan (m)
         hauteur: { default: 0.6 },
-        fond: { default: '' },            // ex : '#1F3A2E' ; vide = transparent (on voit le tableau derrière)
+        fond: { default: '#1F3A2E', vide: 'transparent' },           
         couleur: { default: '#F4F4F0' }   // couleur de la "craie"
     },
 

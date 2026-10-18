@@ -52,20 +52,23 @@
         super-hands="grabStartButtons: gripdown; grabEndButtons: gripup">
       </a-mixin>
     </a-assets>
-
+    <!-- Trop compliqué à mettre en place, je garde le code afin que ça sert de référence pour ajouter d'autre asset dans le futur -->
     <a-assets>
         <a-asset-item id="black-board" src="models/board_school/scene.gltf"></a-asset-item>
     </a-assets>
 
     <!--Affichage des points-->
 
-    <a-entity gltf-model="#black-board"
+    <!-- <a-entity gltf-model="#black-board"
           position="1.3 2 1.5"
           rotation="0 -30 180"
           scale="0.5 0.5 0.5"
-          shadow="cast: true; receive: true"></a-entity>
+          shadow="cast: true; receive: true">
+        </a-entity> -->
     
-    <a-entity tableau-score position="0 1.5 -1.95"></a-entity>
+    <a-entity tableau-score 
+            position="-1.5 1.5 -1.95"
+            rotation = "0 30 0 "></a-entity>
 
     <!-- ===================== LUMIÈRES ===================== -->
 
