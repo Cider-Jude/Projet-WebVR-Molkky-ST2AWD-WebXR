@@ -49,7 +49,8 @@
       -->
       <a-mixin id="main-vr"
         sphere-collider="objects: .saisissable; radius: 0.04"
-        super-hands="grabStartButtons: gripdown; grabEndButtons: gripup">
+        super-hands="grabStartButtons: gripdown; grabEndButtons: gripup"
+        sphere-collider="objects: .saisissable, .bouton; radius: 0.04">
       </a-mixin>
     </a-assets>
     <!-- Trop compliqué à mettre en place, je garde le code afin que ça sert de référence pour ajouter d'autre asset dans le futur -->
@@ -61,14 +62,31 @@
 
     <a-entity gltf-model="#black-board"
           position="-1.5 1.5 -1"
-          rotation="0 -15 0"
+          rotation="0 135 0"
           scale="0.4 0.4 0.4"
           shadow="cast: true; receive: true">
-          <a-entity tableau-score 
-            position="0.03 0 -0.8"
-            rotation = "0 90 0 "></a-entity>
-        </a-entity>
+
+          <!-- Affichage du niveau de difficulté présent et du high score de ce niveau -->
+          <a-entity panneau-texte="nom: entete; largeur: 1.2; hauteur: 0.1; taille: 0.55"
+                    position="0 0.37 0.05"; rotation = "0 -90 0 "></a-entity>
+
+          <!--Affichage du score-->
+          <a-entity tableau-score position="-0.03 -0.03 0"; rotation = "0 -90 0 "></a-entity>
+      
+
+          <!-- Affichage de message d'information sous le score, caché au départ -->
+          <a-entity panneau-texte="nom: info; largeur: 1.2; hauteur: 0.18; taille: 0.3; affiche: false; duree: 4000; couleur: #FFC65D"
+                    position="0 -0.41 -0.03"; rotation = "0 -90 0 "></a-entity>
+    </a-entity>
     
+    <a-entity panneau-texte="nom: fin; largeur: 1.4; hauteur: 0.8; affiche: false; devantJoueur: 1.2; fond: rgba(20,30,28,0.92)">
+      <a-entity class="bouton" hoverable
+                bouton-vr="libelle: Recommencer; evenement: partie-recommencer"
+                position="-0.3 -0.5 0.25"></a-entity>
+      <a-entity class="bouton" hoverable
+                bouton-vr="libelle: Quitter; evenement: partie-quitter; couleur: #8A3A3A; couleurSurvol: #B84A4A"
+                position="0.3 -0.5 0.25"></a-entity>
+    </a-entity>
     
 
     <!-- ===================== LUMIÈRES ===================== -->
@@ -99,10 +117,6 @@
       shadow="cast: true">
     </a-cylinder>
 
-    <!-- Socle (cylindre) qui supporte la quille au départ
-    <a-cylinder static-body="shape: cylinder; cylinderAxis: y"
-                position="0 0.45 -1" radius="0.2" height="0.9"
-                color="#9E7B5A" shadow="cast: true; receive: true"></a-cylinder> -->
 
     <!-- ===================== QUILLES CIBLES ===================== -->
     <!-- Quilles debout, posées pile sur le sol (y = hauteur / 2) et espacées
@@ -184,6 +198,7 @@
         look-controls
         cursor="rayOrigin: mouse; fuse: false"
         raycaster="objects: .saisissable; far: 5"
+        raycaster="objects: .saisissable, .bouton; far: 5"
         super-hands="
           colliderEvent: mouseenter;
           colliderEventProperty: intersectedEl;

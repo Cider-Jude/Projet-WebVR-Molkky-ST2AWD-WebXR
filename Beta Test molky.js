@@ -1,6 +1,7 @@
 var scoreJeu = 0; //le score globale du jeu
 var rates = 0; //Le nombre de coups ratés d'affilé
 var lances = 0; //Le nombre de fois que le joueur a lancé le bâton
+var termine = false;
 var QUILLES = [];                 // registre partagé : toutes les quilles de la scène
 var RELEVAGE = {
     seuilChute: 30,               // inclinaison (°) à partir de laquelle une quille est « tombée »
@@ -118,7 +119,7 @@ function releverLesQuilles() {
 
 function UpdateScore(numeros){
     if (rates == 3){
-        console.log('Vous avez perdu la parties');
+        finDePartie(false);
     } 
     var points = 0
     for (let i = 0; i < numeros.length; i++){
@@ -127,17 +128,33 @@ function UpdateScore(numeros){
     scoreJeu+=points
     if (scoreJeu > 50){
         scoreJeu = 25
-        console.log('Vous avez plus de 50 points de retour à 25');
+        scene.emit('info-afficher', { lignes: ['Vous avez plus de 50 points,', 'retour à 25'] });
     }
-    else{
-        if (scoreJeu == 50){
-            console.log('Vous avez gagné !');
-        }
+    
+    if (scoreJeu == 50){
+        finDePartie(true); 
     }
-    scene.emit('score-mis-a-jour', { total: scoreJeu, dernier: points, rates: rates });
+    
+    scene.emit('score-mis-a-jour', { total: scoreJeu, dernier: points, rates: rates, lances: lances });
 }
 
 var scene = document.querySelector('a-scene');
+
+scene.addEventListener('loaded', function () {
+    scene.emit('entete-afficher', { lignes: ['Niveau : Normale  |  Meilleur score : 10 tirs'] });
+});
+
+function finDePartie(gagne) {
+    termine = true;
+    document.querySelector('#baton').setAttribute('baton', 'actif', false);
+    scene.emit('info-masquer');
+    scene.emit('fin-afficher', { lignes: gagne ?
+        [{ texte: 'Vous avez gagné !', taille: 0.16, couleur: '#8EF0B0' },
+         { texte: 'Nombre de tir : ' + lances, taille: 0.12 }] :
+        [{ texte: 'Vous avez raté 3 fois de suite, vous avez perdu la partie', taille: 0.1, couleur: '#FF8A8A' },
+         { texte: 'Nombre de tir : ' + lances, taille: 0.12 }]
+    });
+}
 
 scene.addEventListener('lancer-termine', function (e) {
     var quilles = e.detail.quilles;   
@@ -150,6 +167,33 @@ scene.addEventListener('lancer-termine', function (e) {
     UpdateScore(numeros);
 });
 
+function recommencer() {
+    total = 0; rates = 0; termine = false;
+    scene.emit('fin-masquer');
+    scene.emit('info-masquer');
+    replacerQuillesAuDepart();
+    document.querySelector('#baton').setAttribute('baton', 'actif', true);
+    scene.emit('score-mis-a-jour', { total: 0, dernier: null, rates: 0 });
+}
+
+function quitter() {
+    // à implémenter plus tard
+    console.log('Quitter : pas encore implémenté');
+}
+
+scene.addEventListener('partie-recommencer', recommencer);
+scene.addEventListener('partie-quitter', quitter);
+
+// Contour arrondi (évite ctx.roundRect, absent des navigateurs un peu anciens)
+function rectArrondi(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+}
 
 
 /* ==========================================================================
@@ -228,7 +272,8 @@ AFRAME.registerComponent('baton', {
         rotationCamera: {
             type: 'vec3',
             default: { x: -30, y: 0, z: 0 }
-        }
+        }, 
+        actif: { default: true }    // false : le bâton ne peut plus être pris (fin de partie)
     },
 
     init: function () {
@@ -307,8 +352,8 @@ AFRAME.registerComponent('baton', {
     },
 
     onPrise: function (evt) {
-        // OBLIGATOIRE : sans preventDefault, super-hands considère que la saisie
-        // a été refusée et n'enverra jamais le grab-end correspondant.
+        if (!this.data.actif) { return; }     // pas de preventDefault : super-hands refuse la saisie
+        // OBLIGATOIRE : sans preventDefault, super-hands considère que la saisie a été refusée et n'enverra jamais le grab-end correspondant.
         evt.preventDefault();
 
         if (this.porteur) {
@@ -1182,7 +1227,7 @@ AFRAME.registerComponent('tableau-score', {
 
     init: function () {
         var d = this.data;
-        this.etat = { total: 0, dernier: null, rates: 0 };
+        this.etat = { total: 0, dernier: null, rates: 0, lances: 0 };
 
         // Le canvas est la "feuille" sur laquelle on écrit ; la texture en est la copie envoyée au GPU
         this.canvas = document.createElement('canvas');
@@ -1225,15 +1270,16 @@ AFRAME.registerComponent('tableau-score', {
         c.textAlign = 'center';
         c.textBaseline = 'middle';
 
-        c.font = 'bold ' + Math.round(H * 0.16) + 'px ' + police;
-        c.fillText('SCORE', W / 2, H * 0.14);
+        c.font = 'bold ' + Math.round(H * 0.10) + 'px ' + police;
+        c.fillText('SCORE', W / 2, H * 0.10);
 
-        c.font = 'bold ' + Math.round(H * 0.42) + 'px ' + police;
-        c.fillText(String(e.total), W / 2, H * 0.50);
+        c.font = 'bold ' + Math.round(H * 0.38) + 'px ' + police;
+        c.fillText(String(e.total), W / 2, H * 0.44);
 
         c.font = Math.round(H * 0.11) + 'px ' + police;
-        c.fillText('Dernier tir : ' + (e.dernier === null ? '-' : '+' + e.dernier), W / 2, H * 0.78);
-        c.fillText('Ratés : ' + e.rates + ' / 3', W / 2, H * 0.92);
+        c.fillText('Dernier tir : ' + (e.dernier === null ? '-' : '+' + e.dernier), W / 2, H * 0.66);
+        c.fillText('Ratés : ' + e.rates + ' / 3', W / 2, H * 0.8);
+        c.fillText('Nombre de tir : ' + e.lances , W / 2, H *0.94);
 
         this.texture.needsUpdate = true;      // indispensable après chaque redessin
     },
@@ -1246,6 +1292,292 @@ AFRAME.registerComponent('tableau-score', {
             plan.material.dispose();
             this.el.removeObject3D('tableau');
         }
+        this.texture.dispose();
+    }
+});
+
+AFRAME.registerComponent('panneau-texte', {
+    schema: {
+        nom: { default: '' },            // nomme les événements : <nom>-afficher et <nom>-masquer
+        largeur: { default: 1.2 },       // taille du plan (m)
+        hauteur: { default: 0.3 },
+        taille: { default: 0.2 },        // taille du texte, en fraction de la hauteur du panneau
+        fond: { default: '' },           // vide = transparent ; ex : rgba(20,30,28,0.9)
+        couleur: { default: '#F4F4F0' },
+        affiche: { default: true },      // visible dès le départ ?
+        duree: { default: 0 },           // ms avant disparition automatique (0 = reste affiché)
+        devantJoueur: { default: 0 }     // > 0 : apparaît à cette distance (m) devant le joueur
+    },
+
+    init: function () {
+        var d = this.data;
+        this.lignes = [];
+        this.minuteur = null;
+
+        this.canvas = document.createElement('canvas');
+        this.canvas.width = 1024;
+        this.canvas.height = Math.max(64, Math.round(1024 * d.hauteur / d.largeur));
+        this.texture = new THREE.CanvasTexture(this.canvas);
+        if (THREE.SRGBColorSpace) { this.texture.colorSpace = THREE.SRGBColorSpace; }
+        else { this.texture.encoding = THREE.sRGBEncoding; }
+        var rendu = this.el.sceneEl.renderer;
+        if (rendu) { this.texture.anisotropy = rendu.capabilities.getMaxAnisotropy(); }
+
+        this.materiau = new THREE.MeshBasicMaterial({ map: this.texture, transparent: true });
+        var plan = new THREE.Mesh(new THREE.PlaneGeometry(d.largeur, d.hauteur), this.materiau);
+        if (d.devantJoueur > 0) {          // panneau d'interface : jamais caché par un objet de la scène
+            this.materiau.depthTest = false;
+            plan.renderOrder = 999;
+        }
+        this.el.setObject3D('panneau', plan);
+        this.el.setAttribute('visible', d.affiche);
+
+        this.afficher = this.afficher.bind(this);
+        this.masquer = this.masquer.bind(this);
+        this.surAfficher = function (e) {
+            var det = e.detail || {};
+            this.afficher(det.lignes, det.duree);
+        }.bind(this);
+
+        if (d.nom) {
+            this.el.sceneEl.addEventListener(d.nom + '-afficher', this.surAfficher);
+            this.el.sceneEl.addEventListener(d.nom + '-masquer', this.masquer);
+        }
+    },
+
+    // lignes : tableau de chaînes ou d'objets { texte, taille, couleur, gras }
+    afficher: function (lignes, duree) {
+        if (lignes) { this.lignes = lignes; this.dessiner(); }
+        if (this.data.devantJoueur > 0) { this.placerDevantJoueur(); }
+        this.el.setAttribute('visible', true);
+
+        clearTimeout(this.minuteur);
+        var ms = duree !== undefined ? duree : this.data.duree;
+        if (ms > 0) { this.minuteur = setTimeout(this.masquer, ms); }
+    },
+
+    masquer: function () {
+        clearTimeout(this.minuteur);
+        this.el.setAttribute('visible', false);
+    },
+
+    // Place le panneau devant le joueur, à hauteur d'yeux, tourné vers lui
+    placerDevantJoueur: function () {
+        var cam = this.el.sceneEl.camera;
+        if (!cam) { return; }
+        var pos = new THREE.Vector3(), dir = new THREE.Vector3();
+        cam.getWorldPosition(pos);
+        cam.getWorldDirection(dir);
+        dir.y = 0;                                       // on ignore l'inclinaison de la tête
+        if (dir.lengthSq() < 1e-4) { dir.set(0, 0, -1); }
+        dir.normalize();
+
+        this.el.object3D.position.set(
+            pos.x + dir.x * this.data.devantJoueur,
+            pos.y,
+            pos.z + dir.z * this.data.devantJoueur
+        );
+        this.el.object3D.rotation.set(0, Math.atan2(-dir.x, -dir.z), 0);   // la face du plan regarde le joueur
+    },
+
+    // Découpe en lignes visuelles (retour à la ligne automatique) et réduit le texte s'il ne tient pas
+    mettreEnPage: function (c, W, H) {
+        var d = this.data;
+        var police = '"Segoe Print", "Comic Sans MS", cursive, sans-serif';
+        var echelle = 1, items, total;
+
+        for (var essai = 0; essai < 12; essai++) {
+            items = []; total = 0;
+            this.lignes.forEach(function (l) {
+                if (typeof l === 'string') { l = { texte: l }; }
+                var px = Math.round(H * (l.taille || d.taille) * echelle);
+                c.font = (l.gras === false ? '' : 'bold ') + px + 'px ' + police;
+
+                var segments = [], courante = '';
+                String(l.texte).split(' ').forEach(function (mot) {
+                    var test = courante ? courante + ' ' + mot : mot;
+                    if (courante && c.measureText(test).width > W * 0.92) {
+                        segments.push(courante);
+                        courante = mot;
+                    } else {
+                        courante = test;
+                    }
+                });
+                if (courante) { segments.push(courante); }
+
+                segments.forEach(function (s) {
+                    items.push({ texte: s, police: c.font, couleur: l.couleur || d.couleur, h: px * 1.2 });
+                    total += px * 1.2;
+                });
+            });
+            if (total <= H * 0.9) { break; }
+            echelle *= 0.9;
+        }
+        return { items: items, total: total };
+    },
+
+    dessiner: function () {
+        var d = this.data;
+        var c = this.canvas.getContext('2d');
+        var W = this.canvas.width, H = this.canvas.height;
+
+        c.clearRect(0, 0, W, H);
+        if (d.fond) {
+            c.fillStyle = d.fond;
+            c.fillRect(0, 0, W, H);
+            c.strokeStyle = d.couleur;
+            c.lineWidth = 6;
+            c.strokeRect(3, 3, W - 6, H - 6);
+        }
+
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        var page = this.mettreEnPage(c, W, H);
+        var y = (H - page.total) / 2;
+        page.items.forEach(function (it) {
+            c.font = it.police;
+            c.fillStyle = it.couleur;
+            c.fillText(it.texte, W / 2, y + it.h / 2);
+            y += it.h;
+        });
+
+        this.texture.needsUpdate = true;
+    },
+
+    remove: function () {
+        clearTimeout(this.minuteur);
+        var d = this.data;
+        if (d.nom) {
+            this.el.sceneEl.removeEventListener(d.nom + '-afficher', this.surAfficher);
+            this.el.sceneEl.removeEventListener(d.nom + '-masquer', this.masquer);
+        }
+        var plan = this.el.getObject3D('panneau');
+        if (plan) {
+            plan.geometry.dispose();
+            this.el.removeObject3D('panneau');
+        }
+        this.materiau.dispose();
+        this.texture.dispose();
+    }
+});
+
+
+AFRAME.registerComponent('bouton-vr', {
+    schema: {
+        libelle: { default: 'Bouton' },
+        evenement: { default: '' },              // événement émis sur la scène quand on appuie
+        largeur: { default: 0.5 },               // taille du bouton (m)
+        hauteur: { default: 0.18 },
+        couleur: { default: '#2F6F4F' },
+        couleurSurvol: { default: '#3FA56F' },
+        couleurTexte: { default: '#FFFFFF' }
+    },
+
+    init: function () {
+        var d = this.data;
+        this.survol = false;
+        this.enfonce = false;
+        this.dernierAppui = 0;
+
+        this.canvas = document.createElement('canvas');
+        this.canvas.width = 512;
+        this.canvas.height = Math.max(64, Math.round(512 * d.hauteur / d.largeur));
+        this.texture = new THREE.CanvasTexture(this.canvas);
+        if (THREE.SRGBColorSpace) { this.texture.colorSpace = THREE.SRGBColorSpace; }
+        else { this.texture.encoding = THREE.sRGBEncoding; }
+        var rendu = this.el.sceneEl.renderer;
+        if (rendu) { this.texture.anisotropy = rendu.capabilities.getMaxAnisotropy(); }
+
+        this.materiau = new THREE.MeshBasicMaterial({ map: this.texture, transparent: true, depthTest: false });
+        var plan = new THREE.Mesh(new THREE.PlaneGeometry(d.largeur, d.hauteur), this.materiau);
+        plan.renderOrder = 1000;                 // toujours dessiné par-dessus le panneau
+        this.el.setObject3D('bouton', plan);
+
+        this.surSurvol = function () {
+            if (!this.estVisible()) { return; }
+            this.survol = true; this.dessiner();
+        }.bind(this);
+        this.surFinSurvol = function () { this.survol = false; this.dessiner(); }.bind(this);
+        this.surClic = function () { this.appuyer(); }.bind(this);           // souris (PC)
+        this.surPrise = function (evt) {                                     // grip en VR, touche G sur PC
+            if (!this.estVisible()) { return; }
+            evt.preventDefault();                                            // saisie acceptée
+            this.appuyer();
+        }.bind(this);
+
+        this.el.addEventListener('hover-start', this.surSurvol);
+        this.el.addEventListener('hover-end', this.surFinSurvol);
+        this.el.addEventListener('click', this.surClic);
+        this.el.addEventListener('grab-start', this.surPrise);
+
+        this.dessiner();
+    },
+
+    // Visible seulement si l'entité ET tous ses parents le sont (le panneau de fin est caché au départ)
+    estVisible: function () {
+        var o = this.el.object3D;
+        while (o) {
+            if (!o.visible) { return false; }
+            o = o.parent;
+        }
+        return true;
+    },
+
+    appuyer: function () {
+        if (!this.estVisible()) { return; }
+        var maintenant = Date.now();
+        if (maintenant - this.dernierAppui < 600) { return; }   // anti double déclenchement
+        this.dernierAppui = maintenant;
+
+        this.survol = false;
+        this.enfonce = true;
+        this.dessiner();
+        setTimeout(function () { this.enfonce = false; this.dessiner(); }.bind(this), 150);
+
+        if (this.data.evenement) { this.el.sceneEl.emit(this.data.evenement); }
+    },
+
+    dessiner: function () {
+        var d = this.data;
+        var c = this.canvas.getContext('2d');
+        var W = this.canvas.width, H = this.canvas.height;
+        var police = '"Segoe UI", Arial, sans-serif';
+
+        c.clearRect(0, 0, W, H);
+        rectArrondi(c, 4, 4, W - 8, H - 8, H * 0.3);
+        // enfoncé : couleurs inversées ; survolé : couleur plus claire
+        c.fillStyle = this.enfonce ? d.couleurTexte : (this.survol ? d.couleurSurvol : d.couleur);
+        c.fill();
+        c.lineWidth = 8;
+        c.strokeStyle = this.survol || this.enfonce ? d.couleurTexte : 'rgba(255,255,255,0.35)';
+        c.stroke();
+
+        // le libellé est réduit s'il ne tient pas dans le bouton
+        var px = Math.round(H * 0.45);
+        c.font = 'bold ' + px + 'px ' + police;
+        while (c.measureText(d.libelle).width > W * 0.86 && px > 10) {
+            px -= 2;
+            c.font = 'bold ' + px + 'px ' + police;
+        }
+        c.fillStyle = this.enfonce ? d.couleur : d.couleurTexte;
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.fillText(d.libelle, W / 2, H / 2 + px * 0.04);
+
+        this.texture.needsUpdate = true;
+    },
+
+    remove: function () {
+        this.el.removeEventListener('hover-start', this.surSurvol);
+        this.el.removeEventListener('hover-end', this.surFinSurvol);
+        this.el.removeEventListener('click', this.surClic);
+        this.el.removeEventListener('grab-start', this.surPrise);
+        var plan = this.el.getObject3D('bouton');
+        if (plan) {
+            plan.geometry.dispose();
+            this.el.removeObject3D('bouton');
+        }
+        this.materiau.dispose();
         this.texture.dispose();
     }
 });
