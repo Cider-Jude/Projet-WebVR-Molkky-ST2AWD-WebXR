@@ -1176,7 +1176,7 @@ AFRAME.registerComponent('tableau-score', {
     schema: {
         largeur: { default: 1.2 },        // taille du plan (m)
         hauteur: { default: 0.6 },
-        fond: { default: '#1F3A2E', vide: 'transparent' },           
+        fond: { default: '' },           // a mettre '#1F3A2E', vide: 'transparent' si on veut l'afficher sans le tableau
         couleur: { default: '#F4F4F0' }   // couleur de la "craie"
     },
 
