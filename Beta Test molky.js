@@ -1632,6 +1632,8 @@ AFRAME.registerComponent('bouton-vr', {
         this.el.addEventListener('hover-end', this.surFinSurvol);
         this.el.addEventListener('click', this.surClic);
         this.el.addEventListener('grab-start', this.surPrise);
+        this.surLache = function (evt) { evt.preventDefault(); };   // libère la main, sinon super-hands la croit encore occupée
+        this.el.addEventListener('grab-end', this.surLache);
 
         this.dessiner();
     },
@@ -1695,6 +1697,7 @@ AFRAME.registerComponent('bouton-vr', {
         this.el.removeEventListener('hover-end', this.surFinSurvol);
         this.el.removeEventListener('click', this.surClic);
         this.el.removeEventListener('grab-start', this.surPrise);
+        this.el.removeEventListener('grab-end', this.surLache);
         var plan = this.el.getObject3D('bouton');
         if (plan) {
             plan.geometry.dispose();
