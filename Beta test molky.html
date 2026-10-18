@@ -48,9 +48,9 @@
         quand un objet "saisissable" rentre dans cette sphere, le joueur peut le saisir en appyant sur le bouton grip.
       -->
       <a-mixin id="main-vr"
-        sphere-collider="objects: .saisissable, .bouton; radius: 0.04"
-        super-hands="grabStartButtons: gripdown; grabEndButtons: gripup">
-      </a-mixin>
+        super-hands="colliderEvent: collisions; colliderEventProperty: els;
+                    colliderEndEvent: collisions; colliderEndEventProperty: clearedEls"
+        sphere-collider="objects: .saisissable, .bouton; radius: 0.06"></a-mixin>
     </a-assets>
     
     <a-assets>
@@ -66,18 +66,22 @@
           shadow="cast: true; receive: true">
 
           <!-- Affichage du niveau de difficulté présent et du high score de ce niveau -->
-          <a-entity panneau-texte="nom: entete; largeur: 1.2; hauteur: 0.1; taille: 0.55"
-                    position="0 0.37 0.05"; rotation = "0 -90 0 "></a-entity>
+          <a-entity panneau-texte="nom: entete; largeur: 2; hauteur: 0.1; taille: 0.55"
+                    position="0 0.37 0"; rotation = "0 -90 0 "></a-entity>
 
           <!--Affichage du score-->
-          <a-entity tableau-score position="-0.03 -0.03 0"; rotation = "0 -90 0 "></a-entity>
+          <a-entity tableau-score position="-0. -0.03 0"; rotation = "0 -90 0 "></a-entity>
       
 
           <!-- Affichage de message d'information sous le score, caché au départ -->
           <a-entity panneau-texte="nom: info; largeur: 1.2; hauteur: 0.18; taille: 0.3; affiche: false; duree: 4000; couleur: #FFC65D"
-                    position="0 -0.41 -0.03"; rotation = "0 -90 0 "></a-entity>
+                    position="0 -0.41 -0"; rotation = "0 -90 0 "></a-entity>
     </a-entity>
     
+    <a-text  value="Prends ton temps" position="2 1.8 0" rotation="0 -90 0" align="center"></a-text>
+    <a-text id="affichage" value="00:00.000" position="2 1.6 0" rotation="0 -90 0" align="center"></a-text>
+    <a-entity id="chrono" chronometre="affichage: #affichage"></a-entity>
+
     <a-entity panneau-texte="nom: fin; largeur: 1.4; hauteur: 0.8; affiche: false; fond: rgba(20,30,28,0.92)"; position="0 1.7 -0.9" >
       <a-entity class="bouton" hoverable
                 bouton-vr="libelle: Recommencer; evenement: partie-recommencer"
@@ -87,6 +91,18 @@
                 position="0.3 -0.5 0.25"></a-entity>
     </a-entity>
     
+    <!-- Bouton 1 : débloque le déplacement -->
+    <a-entity id="btn-activer" class="bouton"
+          bouton-vr="libelle: Activer le mouvement; evenement: activer-mouvement; largeur: 0.6"
+          hoverable clickable
+          position="1.5 1.3 0"
+          rotation="0 -90 0"></a-entity>
+    <!-- Bouton 2 : caché au départ, suit le joueur, téléporte au point 0 -->
+    <!-- À mettre directement dans <a-scene>, pas dans le rig -->
+    <a-entity id="btn-retour" class="bouton" visible="false"
+              bouton-vr="libelle: Retour au départ; evenement: retour-origine; largeur: 0.4; hauteur: 0.14"
+              hoverable clickable
+              suivre-joueur="camera: #camera"></a-entity>
 
     <!-- ===================== LUMIÈRES ===================== -->
 
@@ -184,7 +200,9 @@
 
     <!-- ===================== RIG + CAMÉRA + CONTRÔLEURS ===================== -->
 
-    <a-entity id="rig" movement-controls="fly: false; speed: 0.15" position="0 0 0">
+    <a-entity id="rig" movement-controls="fly: false; speed: 0.15; enabled: false" 
+      gestion-mouvement="boutonActiver: #btn-activer; boutonRetour: #btn-retour"
+      position="0 0 0">
 
       <!--
         La caméra sert de "main" pour tester sur PC :
@@ -217,5 +235,6 @@
   </a-scene>
 
   <script src="Beta Test molky.js"></script>
+  <script src="mouvement-retour.js"></script>
 </body>
 </html>

@@ -1,6 +1,13 @@
 var scoreJeu = 0; //le score globale du jeu
 var rates = 0; //Le nombre de coups ratés d'affilé
 var lances = 0; //Le nombre de fois que le joueur a lancé le bâton
+
+const chrono = document.querySelector('#chrono'); // le chronomètre
+var chronoActif = false; // le chrono s'active dès que le joueur prend le bâton en main pour la première fois
+
+var meilleurScore = 10; // Le meilleur score qu'il faudra connecter à un json
+var meilleurTemps = "10:00:00"; //idem mais pour le temps
+
 var termine = false;
 var QUILLES = [];                 // registre partagé : toutes les quilles de la scène
 var RELEVAGE = {
@@ -157,18 +164,21 @@ function UpdateScore(numeros){
 var scene = document.querySelector('a-scene');
 
 scene.addEventListener('loaded', function () {
-    scene.emit('entete-afficher', { lignes: ['Niveau : Normale  |  Meilleur score : 10 tirs'] });
+    scene.emit('entete-afficher', { lignes: ['Niveau : Normale  |  Meilleur score : ' + meilleurScore + ' tirs | Meilleur temps : ' + meilleurTemps] });
 });
 
 function finDePartie(gagne) {
     termine = true;
+    chrono.emit('chrono-stop');
     document.querySelector('#baton').setAttribute('baton', 'actif', false);
     scene.emit('info-masquer');
     scene.emit('fin-afficher', { lignes: gagne ?
         [{ texte: 'Vous avez gagné !', taille: 0.16, couleur: '#8EF0B0' },
-         { texte: 'Nombre de tir : ' + lances, taille: 0.12 }] :
+         { texte: 'Nombre de tir : ' + lances, taille: 0.12 },
+         { texte: 'Temps : ' + chrono.components.chronometre.getTemps(), taille: 0.12 }] :
         [{ texte: 'Vous avez raté 3 fois de suite, vous avez perdu la partie', taille: 0.1, couleur: '#FF8A8A' },
-         { texte: 'Nombre de tir : ' + lances, taille: 0.12 }]
+         { texte: 'Nombre de tir : ' + lances, taille: 0.12 },
+         { texte: 'Temps : ' + chrono.components.chronometre.formater(chrono.components.chronometre.getTemps()), taille: 0.12 }]
     });
 }
 
@@ -184,12 +194,12 @@ scene.addEventListener('lancer-termine', function (e) {
 });
 
 function recommencer() {
-    total = 0; rates = 0; termine = false;
+    total = 0; rates = 0; lances = 0; termine = false; chrono.emit('chrono-reset'); chronoActif = false;
     scene.emit('fin-masquer');
     scene.emit('info-masquer');
     replacerQuillesAuDepart();
     document.querySelector('#baton').setAttribute('baton', 'actif', true);
-    scene.emit('score-mis-a-jour', { total: 0, dernier: null, rates: 0 });
+    scene.emit('score-mis-a-jour', { total: 0, dernier: null, rates: 0, lances:0 });
 }
 
 function quitter() {
@@ -296,6 +306,7 @@ AFRAME.registerComponent('baton', {
         this.porteur = null;
         this.vitesseImposee = null;
         this.historique = [];
+        this.chrono = document.querySelector('#chrono').components.chronometre;
 
         var p = this.el.getAttribute('position');
         var r = this.el.getAttribute('rotation');
@@ -374,6 +385,11 @@ AFRAME.registerComponent('baton', {
 
         if (this.porteur) {
             return;
+        }
+
+        if(!chronoActif){
+            chronoActif = true;
+            this.chrono.demarrer();
         }
 
         var main = evt.detail.hand;
@@ -676,6 +692,101 @@ AFRAME.registerComponent('commandes-bureau', {
             );
         }
     }
+});
+
+// Composant A-Frame : chronomètre démarré / arrêté par des événements.
+//
+// Utilisation :
+//   <a-text id="affichage" value="00:00.000" position="0 1.6 -2"></a-text>
+//   <a-entity chronometre="affichage: #affichage"></a-entity>
+//
+// Démarrer :  el.emit('chrono-start')
+// Arrêter  :  el.emit('chrono-stop')
+// Remettre à zéro : el.emit('chrono-reset')
+
+AFRAME.registerComponent('chronometre', {
+  schema: {
+    // Noms des événements qui pilotent le chronomètre
+    startEvent: { type: 'string', default: 'chrono-start' },
+    stopEvent: { type: 'string', default: 'chrono-stop' },
+    resetEvent: { type: 'string', default: 'chrono-reset' },
+    // Entité (a-text) où afficher le temps (facultatif)
+    affichage: { type: 'selector' },
+    // Entité qui écoute les événements (par défaut : l'entité elle-même)
+    ecoute: { type: 'selector' }
+  },
+
+  init: function () {
+    this.enMarche = false;
+    this.debut = 0;       // instant de démarrage (ms)
+    this.cumule = 0;      // temps accumulé lors des arrêts précédents (ms)
+
+    this.demarrer = this.demarrer.bind(this);
+    this.arreter = this.arreter.bind(this);
+    this.reinitialiser = this.reinitialiser.bind(this);
+
+    this.cible = this.data.ecoute || this.el;
+    this.cible.addEventListener(this.data.startEvent, this.demarrer);
+    this.cible.addEventListener(this.data.stopEvent, this.arreter);
+    this.cible.addEventListener(this.data.resetEvent, this.reinitialiser);
+
+    this.afficher(0);
+  },
+
+  demarrer: function () {
+    if (this.enMarche) return;
+    this.enMarche = true;
+    this.debut = performance.now();
+    this.el.emit('chrono-started');
+  },
+
+  arreter: function () {
+    if (!this.enMarche) return;
+    this.enMarche = false;
+    this.cumule += performance.now() - this.debut;
+    this.afficher(this.cumule);
+    // Le temps final (en ms) est disponible dans event.detail.temps
+    this.el.emit('chrono-stopped', { temps: this.cumule });
+  },
+
+  reinitialiser: function () {
+    this.enMarche = false;
+    this.cumule = 0;
+    this.afficher(0);
+  },
+
+  // Temps actuel en ms (utilisable depuis un autre script)
+  getTemps: function () {
+    return this.enMarche
+      ? this.cumule + (performance.now() - this.debut)
+      : this.cumule;
+  },
+
+  tick: function () {
+    if (this.enMarche) this.afficher(this.getTemps());
+  },
+
+  afficher: function (ms) {
+    if (!this.data.affichage) return;
+    this.data.affichage.setAttribute('value', this.formater(ms));
+  },
+
+  formater: function (ms) {
+    const minutes = Math.floor(ms / 60000);
+    const secondes = Math.floor((ms % 60000) / 1000);
+    const millis = Math.floor(ms % 1000);
+    return (
+      String(minutes).padStart(2, '0') + ':' +
+      String(secondes).padStart(2, '0') + '.' +
+      String(millis).padStart(3, '0')
+    );
+  },
+
+  remove: function () {
+    this.cible.removeEventListener(this.data.startEvent, this.demarrer);
+    this.cible.removeEventListener(this.data.stopEvent, this.arreter);
+    this.cible.removeEventListener(this.data.resetEvent, this.reinitialiser);
+  }
 });
 
 
