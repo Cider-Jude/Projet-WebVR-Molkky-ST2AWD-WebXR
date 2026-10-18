@@ -268,7 +268,7 @@ AFRAME.registerComponent('sol-absorbant', {
     
 AFRAME.registerComponent('baton', {
     schema: {
-        masse: { default: 0.13 },          // masse de la quille (kg)
+        masse: { default: 0.2 },          // masse de la quille (kg)
         facteurLancer: { default: 1 },     // multiplicateur de la vitesse de la main
         vitesseMax: { default: 15 },       // vitesse de lancer maximale (m/s)
         vitessePC: { default: 7 },         // vitesse de lancer au clic (test PC, m/s)
