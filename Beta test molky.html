@@ -48,9 +48,8 @@
         quand un objet "saisissable" rentre dans cette sphere, le joueur peut le saisir en appyant sur le bouton grip.
       -->
       <a-mixin id="main-vr"
-        sphere-collider="objects: .saisissable; radius: 0.04"
-        super-hands="grabStartButtons: gripdown; grabEndButtons: gripup"
-        sphere-collider="objects: .saisissable, .bouton; radius: 0.04">
+        sphere-collider="objects: .saisissable, .bouton; radius: 0.04"
+        super-hands="grabStartButtons: gripdown; grabEndButtons: gripup">
       </a-mixin>
     </a-assets>
     
