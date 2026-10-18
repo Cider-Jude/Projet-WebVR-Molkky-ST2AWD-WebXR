@@ -144,9 +144,12 @@ function UpdateScore(numeros){
     if (rates == 3){
         finDePartie(false);
     } 
-    var points = 0
-    for (let i = 0; i < numeros.length; i++){
-        points+= numeros[i];
+    var points = 0;
+    if (numeros.length > 1){
+        points = numeros.length;
+    }
+    else{
+        if(numeros.length == 1){points = numeros[0];}
     }
     scoreJeu+=points
     if (scoreJeu > 50){
