@@ -117,6 +117,22 @@ function releverLesQuilles() {
     return relevees;
 }
 
+function replacerQuillesAuDepart() {
+    QUILLES.forEach(function (q) {
+        var el = q.el, y = el.getAttribute('geometry').height / 2;
+        el.object3D.position.set(q.posInit.x, y, q.posInit.z);
+        el.object3D.quaternion.set(0, 0, 0, 1);
+        var b = el.body;
+        if (b) {
+            b.position.set(q.posInit.x, y, q.posInit.z);
+            b.quaternion.set(0, 0, 0, 1);
+            b.velocity.set(0, 0, 0);
+            b.angularVelocity.set(0, 0, 0);
+            b.aabbNeedsUpdate = true;
+        }
+    });
+}
+
 function UpdateScore(numeros){
     if (rates == 3){
         finDePartie(false);
@@ -1306,7 +1322,7 @@ AFRAME.registerComponent('panneau-texte', {
         couleur: { default: '#F4F4F0' },
         affiche: { default: true },      // visible dès le départ ?
         duree: { default: 0 },           // ms avant disparition automatique (0 = reste affiché)
-        devantJoueur: { default: 0 }     // > 0 : apparaît à cette distance (m) devant le joueur
+        devantJoueur: { default: 0.00 }     // > 0 : apparaît à cette distance (m) devant le joueur
     },
 
     init: function () {
@@ -1325,10 +1341,6 @@ AFRAME.registerComponent('panneau-texte', {
 
         this.materiau = new THREE.MeshBasicMaterial({ map: this.texture, transparent: true });
         var plan = new THREE.Mesh(new THREE.PlaneGeometry(d.largeur, d.hauteur), this.materiau);
-        if (d.devantJoueur > 0) {          // panneau d'interface : jamais caché par un objet de la scène
-            this.materiau.depthTest = false;
-            plan.renderOrder = 999;
-        }
         this.el.setObject3D('panneau', plan);
         this.el.setAttribute('visible', d.affiche);
 
@@ -1488,9 +1500,8 @@ AFRAME.registerComponent('bouton-vr', {
         var rendu = this.el.sceneEl.renderer;
         if (rendu) { this.texture.anisotropy = rendu.capabilities.getMaxAnisotropy(); }
 
-        this.materiau = new THREE.MeshBasicMaterial({ map: this.texture, transparent: true, depthTest: false });
-        var plan = new THREE.Mesh(new THREE.PlaneGeometry(d.largeur, d.hauteur), this.materiau);
-        plan.renderOrder = 1000;                 // toujours dessiné par-dessus le panneau
+        this.materiau = new THREE.MeshBasicMaterial({ map: this.texture, transparent: true });
+        var plan = new THREE.Mesh(new THREE.PlaneGeometry(d.largeur, d.hauteur), this.materiau);              
         this.el.setObject3D('bouton', plan);
 
         this.surSurvol = function () {

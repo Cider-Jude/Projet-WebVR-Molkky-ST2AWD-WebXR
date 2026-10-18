@@ -53,7 +53,7 @@
         sphere-collider="objects: .saisissable, .bouton; radius: 0.04">
       </a-mixin>
     </a-assets>
-    <!-- Trop compliqué à mettre en place, je garde le code afin que ça sert de référence pour ajouter d'autre asset dans le futur -->
+    
     <a-assets>
         <a-asset-item id="black-board" src="models/board_school/board.glb"></a-asset-item>
     </a-assets>
@@ -197,7 +197,6 @@
         position="0 1.6 0"
         look-controls
         cursor="rayOrigin: mouse; fuse: false"
-        raycaster="objects: .saisissable; far: 5"
         raycaster="objects: .saisissable, .bouton; far: 5"
         super-hands="
           colliderEvent: mouseenter;
