@@ -1,3 +1,158 @@
+var scoreJeu = 0; //le score globale du jeu
+var rates = 0; //Le nombre de coups ratés d'affilé
+var lances = 0; //Le nombre de fois que le joueur a lancé le bâton
+var QUILLES = [];                 // registre partagé : toutes les quilles de la scène
+var RELEVAGE = {
+    seuilChute: 30,               // inclinaison (°) à partir de laquelle une quille est « tombée »
+    marge: 0.01,                  // espace mini entre deux quilles relevées (m)
+    demiTerrain: 14,              // au-delà, la quille revient à sa place d'origine (m)
+    delaiMax: 5000,               // attente maximale de l'immobilité (ms)
+    enCours: false,
+    callbacks: []          // fonctions à prévenir quand le relevage est terminé
+};
+
+// Tombée = l'axe de la quille penche de plus de seuilChute degrés par rapport à la verticale
+function quilleEstTombee(el) {
+    var haut = new THREE.Vector3(0, 1, 0).applyQuaternion(el.object3D.quaternion);
+    return haut.y < Math.cos(THREE.MathUtils.degToRad(RELEVAGE.seuilChute));
+}
+
+function quilleAuRepos(el) {
+    var b = el.body;
+    return !b || (b.velocity.length() < 0.05 && b.angularVelocity.length() < 0.15);
+}
+
+// Évalue le tir qui vient d'avoir lieu et appelle callback({ touche, quilles })
+//  - rien ne bouge et rien n'est tombé : tir raté, callback immédiat
+//  - sinon : on attend l'immobilité, on relève, puis callback
+function evaluerLancer(callback) {
+    var concerne = QUILLES.some(function (q) {
+        return quilleEstTombee(q.el) || !quilleAuRepos(q.el);
+    });
+    if (!concerne) { callback({ touche: false, quilles: [] }); return; }
+
+    RELEVAGE.callbacks.push(callback);
+    if (RELEVAGE.enCours) { return; }       // un relevage est déjà en attente : il préviendra aussi celui-ci
+    RELEVAGE.enCours = true;
+
+    var debut = Date.now(), calmes = 0;
+    (function verifier() {
+        var repos = QUILLES.every(function (q) { return quilleAuRepos(q.el); });
+        calmes = repos ? calmes + 1 : 0;
+        if (calmes >= 5 || Date.now() - debut > RELEVAGE.delaiMax) {
+            var relevees = releverLesQuilles();
+            RELEVAGE.enCours = false;
+            var cbs = RELEVAGE.callbacks;
+            RELEVAGE.callbacks = [];
+            cbs.forEach(function (cb) {
+                cb({ touche: relevees.length > 0, quilles: relevees });
+            });
+        } else {
+            setTimeout(verifier, 100);
+        }
+    })();
+}
+
+function releverLesQuilles() {
+    // 1) Où va chaque quille ? Debout : elle reste où elle est.
+    //    Tombée : sous le bout biseauté (axe +Y local), en ne gardant que x et z.
+    var pts = QUILLES.map(function (q) {
+        var el = q.el, dim = el.getAttribute('geometry');
+        var tombee = quilleEstTombee(el), x, z;
+        if (tombee) {
+            el.object3D.updateMatrixWorld(true);
+            var bout = el.object3D.localToWorld(new THREE.Vector3(0, dim.height / 2, 0));
+            x = bout.x; z = bout.z;
+            // sortie du terrain : retour à la place d'origine
+            if (Math.abs(x) > RELEVAGE.demiTerrain || Math.abs(z + 4) > RELEVAGE.demiTerrain) {
+                x = q.posInit.x; z = q.posInit.z;
+            }
+        } else {
+            x = el.object3D.position.x; z = el.object3D.position.z;
+        }
+        return { el: el, y: dim.height / 2, x: x, z: z, fixe: !tombee };
+    });
+
+    // 2) Anti-chevauchement : les quilles relevées sont écartées des voisines
+    //    (les quilles restées debout ne bougent pas)
+    var ecartMin = 2 * QUILLES[0].el.getAttribute('geometry').radius + RELEVAGE.marge;
+    for (var it = 0; it < 80; it++) {
+        var bouge = false;
+        for (var i = 0; i < pts.length; i++) {
+            for (var j = i + 1; j < pts.length; j++) {
+                var A = pts[i], B = pts[j];
+                if (A.fixe && B.fixe) { continue; }
+                var dx = B.x - A.x, dz = B.z - A.z, d = Math.sqrt(dx * dx + dz * dz);
+                if (d >= ecartMin) { continue; }
+                var nx = d > 1e-4 ? dx / d : 1, nz = d > 1e-4 ? dz / d : 0, rec = ecartMin - d;
+                var pA = A.fixe ? 0 : (B.fixe ? 1 : 0.5), pB = 1 - pA;
+                A.x -= nx * rec * pA; A.z -= nz * rec * pA;
+                B.x += nx * rec * pB; B.z += nz * rec * pB;
+                bouge = true;
+            }
+        }
+        if (!bouge) { break; }
+    }
+
+    // 3) Téléportation : entité ET corps physique, debout, vitesses nulles
+    var relevees = [];
+    pts.forEach(function (p) {
+        if (p.fixe) { return; }
+        relevees.push(p.el);
+        p.el.object3D.position.set(p.x, p.y, p.z);
+        p.el.object3D.quaternion.set(0, 0, 0, 1);
+        var b = p.el.body;
+        if (b) {
+            b.position.set(p.x, p.y, p.z);
+            b.quaternion.set(0, 0, 0, 1);
+            b.velocity.set(0, 0, 0);
+            b.angularVelocity.set(0, 0, 0);
+            b.aabbNeedsUpdate = true;
+        }
+    });
+
+    // utile pour la suite (comptage des points)
+    document.querySelector('a-scene').emit('quilles-relevees', { quilles: relevees });
+    return relevees;
+}
+
+function UpdateScore(numeros){
+    if (rates == 3){
+        console.log('Vous avez perdu la parties');
+    } 
+    var points = 0
+    for (let i = 0; i < numeros.length; i++){
+        points+= numeros[i];
+    }
+    scoreJeu+=points
+    if (scoreJeu > 50){
+        scoreJeu = 25
+        console.log('Vous avez plus de 50 points de retour à 25');
+    }
+    else{
+        if (scoreJeu == 50){
+            console.log('Vous avez gagné !');
+        }
+    }
+    scene.emit('score-mis-a-jour', { total: scoreJeu, dernier: points, rates: rates });
+}
+
+var scene = document.querySelector('a-scene');
+
+scene.addEventListener('lancer-termine', function (e) {
+    var quilles = e.detail.quilles;   
+
+    var numeros = quilles.map(function (el) {
+        return el.components.quille.data.numero;
+    });
+    rates = e.detail.touche ? 0 : rates + 1;
+    lances+=1;
+    UpdateScore(numeros);
+
+});
+
+
+
 /* ==========================================================================
     Composant `sol absorbant`
     - modification du rebond et de la friction du sol pour rendre la simulation du lancée du bâton plus réaliste et moins frustrant
@@ -464,120 +619,7 @@ AFRAME.registerComponent('commandes-bureau', {
 });
 
 
-var QUILLES = [];                 // registre partagé : toutes les quilles de la scène
-var RELEVAGE = {
-    seuilChute: 30,               // inclinaison (°) à partir de laquelle une quille est « tombée »
-    marge: 0.01,                  // espace mini entre deux quilles relevées (m)
-    demiTerrain: 14,              // au-delà, la quille revient à sa place d'origine (m)
-    delaiMax: 5000,               // attente maximale de l'immobilité (ms)
-    enCours: false,
-    callbacks: []          // fonctions à prévenir quand le relevage est terminé
-};
 
-// Tombée = l'axe de la quille penche de plus de seuilChute degrés par rapport à la verticale
-function quilleEstTombee(el) {
-    var haut = new THREE.Vector3(0, 1, 0).applyQuaternion(el.object3D.quaternion);
-    return haut.y < Math.cos(THREE.MathUtils.degToRad(RELEVAGE.seuilChute));
-}
-
-function quilleAuRepos(el) {
-    var b = el.body;
-    return !b || (b.velocity.length() < 0.05 && b.angularVelocity.length() < 0.15);
-}
-
-// Évalue le tir qui vient d'avoir lieu et appelle callback({ touche, quilles })
-//  - rien ne bouge et rien n'est tombé : tir raté, callback immédiat
-//  - sinon : on attend l'immobilité, on relève, puis callback
-function evaluerLancer(callback) {
-    var concerne = QUILLES.some(function (q) {
-        return quilleEstTombee(q.el) || !quilleAuRepos(q.el);
-    });
-    if (!concerne) { callback({ touche: false, quilles: [] }); return; }
-
-    RELEVAGE.callbacks.push(callback);
-    if (RELEVAGE.enCours) { return; }       // un relevage est déjà en attente : il préviendra aussi celui-ci
-    RELEVAGE.enCours = true;
-
-    var debut = Date.now(), calmes = 0;
-    (function verifier() {
-        var repos = QUILLES.every(function (q) { return quilleAuRepos(q.el); });
-        calmes = repos ? calmes + 1 : 0;
-        if (calmes >= 5 || Date.now() - debut > RELEVAGE.delaiMax) {
-            var relevees = releverLesQuilles();
-            RELEVAGE.enCours = false;
-            var cbs = RELEVAGE.callbacks;
-            RELEVAGE.callbacks = [];
-            cbs.forEach(function (cb) {
-                cb({ touche: relevees.length > 0, quilles: relevees });
-            });
-        } else {
-            setTimeout(verifier, 100);
-        }
-    })();
-}
-
-function releverLesQuilles() {
-    // 1) Où va chaque quille ? Debout : elle reste où elle est.
-    //    Tombée : sous le bout biseauté (axe +Y local), en ne gardant que x et z.
-    var pts = QUILLES.map(function (q) {
-        var el = q.el, dim = el.getAttribute('geometry');
-        var tombee = quilleEstTombee(el), x, z;
-        if (tombee) {
-            el.object3D.updateMatrixWorld(true);
-            var bout = el.object3D.localToWorld(new THREE.Vector3(0, dim.height / 2, 0));
-            x = bout.x; z = bout.z;
-            // sortie du terrain : retour à la place d'origine
-            if (Math.abs(x) > RELEVAGE.demiTerrain || Math.abs(z + 4) > RELEVAGE.demiTerrain) {
-                x = q.posInit.x; z = q.posInit.z;
-            }
-        } else {
-            x = el.object3D.position.x; z = el.object3D.position.z;
-        }
-        return { el: el, y: dim.height / 2, x: x, z: z, fixe: !tombee };
-    });
-
-    // 2) Anti-chevauchement : les quilles relevées sont écartées des voisines
-    //    (les quilles restées debout ne bougent pas)
-    var ecartMin = 2 * QUILLES[0].el.getAttribute('geometry').radius + RELEVAGE.marge;
-    for (var it = 0; it < 80; it++) {
-        var bouge = false;
-        for (var i = 0; i < pts.length; i++) {
-            for (var j = i + 1; j < pts.length; j++) {
-                var A = pts[i], B = pts[j];
-                if (A.fixe && B.fixe) { continue; }
-                var dx = B.x - A.x, dz = B.z - A.z, d = Math.sqrt(dx * dx + dz * dz);
-                if (d >= ecartMin) { continue; }
-                var nx = d > 1e-4 ? dx / d : 1, nz = d > 1e-4 ? dz / d : 0, rec = ecartMin - d;
-                var pA = A.fixe ? 0 : (B.fixe ? 1 : 0.5), pB = 1 - pA;
-                A.x -= nx * rec * pA; A.z -= nz * rec * pA;
-                B.x += nx * rec * pB; B.z += nz * rec * pB;
-                bouge = true;
-            }
-        }
-        if (!bouge) { break; }
-    }
-
-    // 3) Téléportation : entité ET corps physique, debout, vitesses nulles
-    var relevees = [];
-    pts.forEach(function (p) {
-        if (p.fixe) { return; }
-        relevees.push(p.el);
-        p.el.object3D.position.set(p.x, p.y, p.z);
-        p.el.object3D.quaternion.set(0, 0, 0, 1);
-        var b = p.el.body;
-        if (b) {
-            b.position.set(p.x, p.y, p.z);
-            b.quaternion.set(0, 0, 0, 1);
-            b.velocity.set(0, 0, 0);
-            b.angularVelocity.set(0, 0, 0);
-            b.aabbNeedsUpdate = true;
-        }
-    });
-
-    // utile pour la suite (comptage des points)
-    document.querySelector('a-scene').emit('quilles-relevees', { quilles: relevees });
-    return relevees;
-}
 
 /* ==========================================================================
     Composant `quille`
@@ -628,10 +670,6 @@ AFRAME.registerComponent('quille', {
 
         /*
          * On attend que le mesh visuel ET le body physique existent.
-         *
-         * C'est très important :
-         * on ne touche pas à la géométrie avant que le collider
-         * ait été créé, afin de ne pas perturber la physique.
          */
         var mesh = this.el.getObject3D('mesh');
 
@@ -1132,5 +1170,83 @@ AFRAME.registerComponent('quille', {
 
         this.faceMaterial = null;
         this.mesh = null;
+    }
+});
+
+AFRAME.registerComponent('tableau-score', {
+    schema: {
+        largeur: { default: 1.2 },        // taille du plan (m)
+        hauteur: { default: 0.6 },
+        fond: { default: '' },            // ex : '#1F3A2E' ; vide = transparent (on voit le tableau derrière)
+        couleur: { default: '#F4F4F0' }   // couleur de la "craie"
+    },
+
+    init: function () {
+        var d = this.data;
+        this.etat = { total: 0, dernier: null, rates: 0 };
+
+        // Le canvas est la "feuille" sur laquelle on écrit ; la texture en est la copie envoyée au GPU
+        this.canvas = document.createElement('canvas');
+        this.canvas.width = 1024;
+        this.canvas.height = Math.round(1024 * d.hauteur / d.largeur);
+        this.texture = new THREE.CanvasTexture(this.canvas);
+        if (THREE.SRGBColorSpace) { this.texture.colorSpace = THREE.SRGBColorSpace; }
+        else { this.texture.encoding = THREE.sRGBEncoding; }
+        var rendu = this.el.sceneEl.renderer;
+        if (rendu) { this.texture.anisotropy = rendu.capabilities.getMaxAnisotropy(); }
+
+        var plan = new THREE.Mesh(
+            new THREE.PlaneGeometry(d.largeur, d.hauteur),
+            new THREE.MeshBasicMaterial({ map: this.texture, transparent: true })
+        );
+        this.el.setObject3D('tableau', plan);
+
+        // Le plan se met à jour uniquement quand le score change (pas à chaque image)
+        this.maj = this.maj.bind(this);
+        this.el.sceneEl.addEventListener('score-mis-a-jour', this.maj);
+
+        this.dessiner();
+    },
+
+    maj: function (e) {
+        Object.assign(this.etat, e.detail);   // { total, dernier, rates }
+        this.dessiner();
+    },
+
+    dessiner: function () {
+        var d = this.data, e = this.etat;
+        var c = this.canvas.getContext('2d');
+        var W = this.canvas.width, H = this.canvas.height;
+        var police = '"Segoe Print", "Comic Sans MS", cursive, sans-serif';   // polices du système
+
+        c.clearRect(0, 0, W, H);
+        if (d.fond) { c.fillStyle = d.fond; c.fillRect(0, 0, W, H); }
+
+        c.fillStyle = d.couleur;
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+
+        c.font = 'bold ' + Math.round(H * 0.16) + 'px ' + police;
+        c.fillText('SCORE', W / 2, H * 0.14);
+
+        c.font = 'bold ' + Math.round(H * 0.42) + 'px ' + police;
+        c.fillText(String(e.total), W / 2, H * 0.50);
+
+        c.font = Math.round(H * 0.11) + 'px ' + police;
+        c.fillText('Dernier tir : ' + (e.dernier === null ? '-' : '+' + e.dernier), W / 2, H * 0.78);
+        c.fillText('Ratés : ' + e.rates + ' / 3', W / 2, H * 0.92);
+
+        this.texture.needsUpdate = true;      // indispensable après chaque redessin
+    },
+
+    remove: function () {
+        this.el.sceneEl.removeEventListener('score-mis-a-jour', this.maj);
+        var plan = this.el.getObject3D('tableau');
+        if (plan) {
+            plan.geometry.dispose();
+            plan.material.dispose();
+            this.el.removeObject3D('tableau');
+        }
+        this.texture.dispose();
     }
 });
