@@ -1613,10 +1613,11 @@ AFRAME.registerComponent('bouton-vr', {
 
         this.materiau = new THREE.MeshBasicMaterial({ map: this.texture, transparent: true });
         var plan = new THREE.Mesh(new THREE.PlaneGeometry(d.largeur, d.hauteur), this.materiau);              
-        this.el.setObject3D('bouton', plan);
+        this.el.setObject3D('mesh', plan);
 
-        this.surSurvol = function () {
+        this.surSurvol = function (evt) {
             if (!this.estVisible()) { return; }
+            evt.preventDefault();               // survol accepté, seulement si visible (remplace hoverable)
             this.survol = true; this.dessiner();
         }.bind(this);
         this.surFinSurvol = function () { this.survol = false; this.dessiner(); }.bind(this);
@@ -1701,5 +1702,11 @@ AFRAME.registerComponent('bouton-vr', {
         }
         this.materiau.dispose();
         this.texture.dispose();
+
+        var plan = this.el.getObject3D('mesh');
+        if (plan) {
+            plan.geometry.dispose();
+            this.el.removeObject3D('mesh');
+        }
     }
 });
