@@ -81,6 +81,7 @@
     <a-text id="affichage" value="00:00.000" position="2 1.6 0" rotation="0 -90 0" align="center"></a-text>
     <a-entity id="chrono" chronometre="affichage: #affichage"></a-entity>
 
+    <!--Paneau + bouton qui s'affiche en fin de partie-->
     <a-entity panneau-texte="nom: fin; largeur: 1.4; hauteur: 0.8; affiche: false; fond: rgba(20,30,28,0.92)"; position="0 1.7 -0.9" >
       <a-entity class="bouton" hoverable
                 bouton-vr="libelle: Recommencer; evenement: partie-recommencer"
@@ -94,7 +95,7 @@
     <a-entity id="btn-activer" class="bouton"
           bouton-vr="libelle: Activer le mouvement; evenement: activer-mouvement; largeur: 0.6"
           hoverable clickable
-          position="1.5 1.3 0"
+          position="1 1.3 0"
           rotation="0 -90 0"></a-entity>
     <!-- Bouton 2 : caché au départ, suit le joueur, téléporte au point 0 -->
     <!-- À mettre directement dans <a-scene>, pas dans le rig -->
@@ -235,5 +236,6 @@
 
   <script src="Beta Test molky.js"></script>
   <script src="mouvement-retour.js"></script>
+  <script src="Records.js"></script>
 </body>
 </html>

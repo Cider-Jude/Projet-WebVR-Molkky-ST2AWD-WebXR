@@ -166,23 +166,44 @@ function UpdateScore(numeros){
 
 var scene = document.querySelector('a-scene');
 
-scene.addEventListener('loaded', function () {
-    scene.emit('entete-afficher', { lignes: ['Niveau : Normale  |  Meilleur score : ' + meilleurScore + ' tirs | Meilleur temps : ' + meilleurTemps] });
-});
+function afficherEntete() {
+    const r = lireRecord();
+    const texte = r === null
+        ? 'Aucun record'
+        : 'Record : ' + r.lances + ' tirs en ' + chrono.components.chronometre.formater(r.temps);
+    scene.emit('entete-afficher', { lignes: ['Niveau : Normale  |  ' + texte] });
+}
+scene.addEventListener('loaded', afficherEntete);
 
 function finDePartie(gagne) {
     termine = true;
     chrono.emit('chrono-stop');
     document.querySelector('#baton').setAttribute('baton', 'actif', false);
     scene.emit('info-masquer');
-    scene.emit('fin-afficher', { lignes: gagne ?
-        [{ texte: 'Vous avez gagné !', taille: 0.16, couleur: '#8EF0B0' },
-         { texte: 'Nombre de tir : ' + lances, taille: 0.12 },
-         { texte: 'Temps : ' + chrono.components.chronometre.getTemps(), taille: 0.12 }] :
-        [{ texte: 'Vous avez raté 3 fois de suite, vous avez perdu la partie', taille: 0.1, couleur: '#FF8A8A' },
-         { texte: 'Nombre de tir : ' + lances, taille: 0.12 },
-         { texte: 'Temps : ' + chrono.components.chronometre.formater(chrono.components.chronometre.getTemps()), taille: 0.12 }]
-    });
+
+    const chronometre = chrono.components.chronometre;
+    const temps = chronometre.getTemps();            // en ms, figé car le chrono vient d'être arrêté
+    const tempsTexte = chronometre.formater(temps);
+
+    if (gagne) {
+        const nouveauRecord = enregistrerSiRecord(lances, temps);   // victoire uniquement
+        const lignes = [
+            { texte: 'Vous avez gagné !', taille: 0.16, couleur: '#8EF0B0' },
+            { texte: 'Nombre de tir : ' + lances, taille: 0.12 },
+            { texte: 'Temps : ' + tempsTexte, taille: 0.12 }
+        ];
+        if (nouveauRecord) {
+            lignes.push({ texte: 'Nouveau record !', taille: 0.12, couleur: '#FFC65D' });
+            afficherEntete();                                       // met à jour le bandeau du haut
+        }
+        scene.emit('fin-afficher', { lignes: lignes });
+    } else {
+        scene.emit('fin-afficher', { lignes: [
+            { texte: 'Vous avez raté 3 fois de suite, vous avez perdu la partie', taille: 0.1, couleur: '#FF8A8A' },
+            { texte: 'Nombre de tir : ' + lances, taille: 0.12 },
+            { texte: 'Temps : ' + tempsTexte, taille: 0.12 }
+        ] });
+    }
 }
 
 scene.addEventListener('lancer-termine', function (e) {
