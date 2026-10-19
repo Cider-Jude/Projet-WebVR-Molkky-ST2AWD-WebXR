@@ -1737,3 +1737,26 @@ AFRAME.registerComponent('bouton-vr', {
         }
     }
 });
+
+AFRAME.registerComponent('hauteur-yeux', {
+    schema: { hauteur: { default: 1.6 } },     // hauteur des yeux hors casque (m)
+
+    init: function () {
+        var scene = this.el.sceneEl;
+        this.surEntree = function () { this.regler(0); }.bind(this);                  // en VR : le casque donne déjà la vraie hauteur
+        this.surSortie = function () { this.regler(this.data.hauteur); }.bind(this);  // sur écran : on remet 1,6 m
+        scene.addEventListener('enter-vr', this.surEntree);
+        scene.addEventListener('exit-vr', this.surSortie);
+        this.regler(scene.is('vr-mode') ? 0 : this.data.hauteur);
+    },
+
+    regler: function (y) {
+        var p = this.el.getAttribute('position');
+        this.el.setAttribute('position', { x: p.x, y: y, z: p.z });
+    },
+
+    remove: function () {
+        this.el.sceneEl.removeEventListener('enter-vr', this.surEntree);
+        this.el.sceneEl.removeEventListener('exit-vr', this.surSortie);
+    }
+});
