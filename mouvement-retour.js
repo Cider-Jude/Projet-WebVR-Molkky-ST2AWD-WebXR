@@ -71,7 +71,7 @@ AFRAME.registerComponent('gestion-mouvement', {
     var boutonActiver = document.querySelector(this.data.boutonActiver);
     if (boutonActiver) { boutonActiver.setAttribute('visible', true); }
 
-    document.querySelector('#baton').setAttribute('baton', 'actif', true);
+    document.querySelector('#baton').setAttribute('baton', 'actif', etat === 'partie');
     this.el.emit('retour-effectue');
     if(chronoActif){
       this.chrono.demarrer();

@@ -166,6 +166,91 @@ function UpdateScore(numeros){
 
 var scene = document.querySelector('a-scene');
 
+// ===================== NIVEAUX =====================
+var NIVEAUX = {
+    facile:    { nom: 'Facile',    distance: 1.5, ecart: 0.15, restitution: 0.05, aideVisee: true  },
+    normale:   { nom: 'Normale',   distance: 2.0, ecart: 0.05, restitution: 0.05, aideVisee: false },
+    difficile: { nom: 'Difficile', distance: 2.0, ecart: 0.01, restitution: 0.1,  aideVisee: false }
+};
+
+// Place de chaque quille dans la formation : [colonne (en demi-pas), rangée]
+var DISPOSITION = {
+    1: [-1, 0], 2: [1, 0],
+    3: [-2, 1], 10: [0, 1], 4: [2, 1],
+    5: [-3, 2], 11: [-1, 2], 12: [1, 2], 6: [3, 2],
+    7: [-2, 3], 9: [0, 3], 8: [2, 3]
+};
+
+var niveauCourant = 'normale';
+var etat = 'menu';              // 'menu' | 'partie' | 'fin'
+
+function appliquerNiveau(cle) {
+    var n = NIVEAUX[cle];
+    var rayon = QUILLES[0].el.getAttribute('geometry').radius;
+    var pas = 2 * rayon + n.ecart;                   // distance entre les centres de deux quilles voisines
+    var decalageRangee = pas * Math.sqrt(3) / 2;     // quilles en quinconce
+    QUILLES.forEach(function (q) {
+        var d = DISPOSITION[q.data.numero];
+        q.posInit = { x: d[0] * pas / 2, z: -(n.distance + d[1] * decalageRangee) };
+    });
+    replacerQuillesAuDepart();
+    document.querySelector('[sol-absorbant]').setAttribute('sol-absorbant', 'restitution', n.restitution);
+    scene.emit('aide-visee', { active: n.aideVisee });   // à brancher quand l'aide à la visée existera
+}
+
+function afficherEntete() {
+    var texte;
+    if (etat === 'menu') {
+        texte = 'Choisis un niveau';
+    } else {
+        var r = lireRecord(niveauCourant);
+        texte = 'Niveau : ' + NIVEAUX[niveauCourant].nom + '  |  ' +
+            (r === null ? 'Aucun record' : 'Record : ' + r.lances + ' tirs en ' + chrono.components.chronometre.formater(r.temps));
+    }
+    scene.emit('entete-afficher', { lignes: [texte] });
+}
+
+function ouvrirMenu() {
+    etat = 'menu';
+    scoreJeu = 0; rates = 0; lances = 0; termine = false;
+    chrono.emit('chrono-reset'); chronoActif = false;
+    document.querySelector('#baton').setAttribute('baton', 'actif', false);
+    scene.emit('fin-masquer');
+    scene.emit('info-masquer');
+    appliquerNiveau(niveauCourant);                  // les quilles servent de décor dans le menu
+    scene.emit('score-mis-a-jour', { total: 0, dernier: null, rates: 0, lances: 0 });
+    scene.emit('menu-afficher', { lignes: [
+        { texte: 'Mölkky', taille: 0.22, couleur: '#FFC65D' },
+        { texte: 'Choisis ton niveau', taille: 0.13 }
+    ] });
+    afficherEntete();
+}
+
+function demarrerPartie(cle) {
+    niveauCourant = cle;
+    etat = 'partie';
+    termine = false;
+    scoreJeu = 0; rates = 0; lances = 0;             // scoreJeu : c'est bien lui qu'il faut remettre à zéro
+    chrono.emit('chrono-reset'); chronoActif = false;
+    appliquerNiveau(cle);
+    scene.emit('menu-masquer');
+    scene.emit('fin-masquer');
+    scene.emit('info-masquer');
+    scene.emit('score-mis-a-jour', { total: 0, dernier: null, rates: 0, lances: 0 });
+    afficherEntete();
+    document.querySelector('#baton').setAttribute('baton', 'actif', true);
+}
+
+function recommencer() { demarrerPartie(niveauCourant); }   // même niveau
+function quitter() { ouvrirMenu(); }                         // retour au menu
+
+Object.keys(NIVEAUX).forEach(function (cle) {
+    scene.addEventListener('niveau-' + cle, function () {
+        if (etat === 'menu') { demarrerPartie(cle); }
+    });
+});
+scene.addEventListener('loaded', ouvrirMenu);
+
 function afficherEntete() {
     const r = lireRecord();
     const texte = r === null
@@ -173,20 +258,20 @@ function afficherEntete() {
         : 'Record : ' + r.lances + ' tirs en ' + chrono.components.chronometre.formater(r.temps);
     scene.emit('entete-afficher', { lignes: ['Niveau : Normale  |  ' + texte] });
 }
-scene.addEventListener('loaded', afficherEntete);
 
 function finDePartie(gagne) {
     termine = true;
+    etat = 'fin';
     chrono.emit('chrono-stop');
     document.querySelector('#baton').setAttribute('baton', 'actif', false);
     scene.emit('info-masquer');
 
     const chronometre = chrono.components.chronometre;
-    const temps = chronometre.getTemps();            // en ms, figé car le chrono vient d'être arrêté
+    const temps = chronometre.getTemps();
     const tempsTexte = chronometre.formater(temps);
 
     if (gagne) {
-        const nouveauRecord = enregistrerSiRecord(lances, temps);   // victoire uniquement
+        const nouveauRecord = enregistrerSiRecord(niveauCourant, lances, temps);
         const lignes = [
             { texte: 'Vous avez gagné !', taille: 0.16, couleur: '#8EF0B0' },
             { texte: 'Nombre de tir : ' + lances, taille: 0.12 },
@@ -194,7 +279,7 @@ function finDePartie(gagne) {
         ];
         if (nouveauRecord) {
             lignes.push({ texte: 'Nouveau record !', taille: 0.12, couleur: '#FFC65D' });
-            afficherEntete();                                       // met à jour le bandeau du haut
+            afficherEntete();
         }
         scene.emit('fin-afficher', { lignes: lignes });
     } else {
@@ -217,19 +302,7 @@ scene.addEventListener('lancer-termine', function (e) {
     UpdateScore(numeros);
 });
 
-function recommencer() {
-    total = 0; rates = 0; lances = 0; termine = false; chrono.emit('chrono-reset'); chronoActif = false;
-    scene.emit('fin-masquer');
-    scene.emit('info-masquer');
-    replacerQuillesAuDepart();
-    document.querySelector('#baton').setAttribute('baton', 'actif', true);
-    scene.emit('score-mis-a-jour', { total: 0, dernier: null, rates: 0, lances:0 });
-}
 
-function quitter() {
-    // à implémenter plus tard
-    console.log('Quitter : pas encore implémenté');
-}
 
 scene.addEventListener('partie-recommencer', recommencer);
 scene.addEventListener('partie-quitter', quitter);
@@ -277,8 +350,17 @@ AFRAME.registerComponent('sol-absorbant', {
             frictionEquationRegularization: s.frictionEquationRegularization
         });
         this.el.body.material = sys.driver.getMaterial('sol');
-    }
+        this.contact = sys.driver.contactMaterial;     
+        this.el.body.material = sys.driver.getMaterial('sol');
+    },
+    update: function () {
+        if (!this.contact) { return; }
+        this.contact.friction = this.data.friction;
+        this.contact.restitution = this.data.restitution;
+    },
 });
+
+
 
 
 /* ==========================================================================
@@ -1646,9 +1728,12 @@ AFRAME.registerComponent('bouton-vr', {
         }.bind(this);
         this.surFinSurvol = function () { this.survol = false; this.dessiner(); }.bind(this);
         this.surClic = function () { this.appuyer(); }.bind(this);           // souris (PC)
-        this.surPrise = function (evt) {                                     // grip en VR, touche G sur PC
+        this.surPrise = function (evt) {
             if (!this.estVisible()) { return; }
-            evt.preventDefault();                                            // saisie acceptée
+            var main = evt.detail && evt.detail.hand;
+            // en VR, la main doit être contre la plaque ; sur PC (la caméra sert de main), pas de test
+            if (main && !main.components.camera && !this.mainSurLeBouton(main)) { return; }
+            evt.preventDefault();
             this.appuyer();
         }.bind(this);
 
@@ -1670,6 +1755,16 @@ AFRAME.registerComponent('bouton-vr', {
             o = o.parent;
         }
         return true;
+    },
+
+    mainSurLeBouton: function (main) {
+        var p = new THREE.Vector3();
+        main.object3D.getWorldPosition(p);
+        this.el.object3D.worldToLocal(p);               // position de la main dans le repère du bouton
+        var d = this.data, marge = 0.06;
+        return Math.abs(p.x) <= d.largeur / 2 + marge &&
+            Math.abs(p.y) <= d.hauteur / 2 + marge &&
+            Math.abs(p.z) <= 0.15;
     },
 
     appuyer: function () {
