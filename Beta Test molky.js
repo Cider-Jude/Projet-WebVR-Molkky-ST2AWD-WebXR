@@ -12,6 +12,7 @@ var meilleurTemps = "10:00:00"; //idem mais pour le temps
 var termine = false;
 var QUILLES = [];                 // registre partagé : toutes les quilles de la scène
 var RELEVAGE = {
+    generation: 0,
     seuilChute: 30,               // inclinaison (°) à partir de laquelle une quille est « tombée »
     marge: 0.01,                  // espace mini entre deux quilles relevées (m)
     demiTerrain: 14,              // au-delà, la quille revient à sa place d'origine (m)
@@ -43,9 +44,11 @@ function evaluerLancer(callback) {
     RELEVAGE.callbacks.push(callback);
     if (RELEVAGE.enCours) { return; }       // un relevage est déjà en attente : il préviendra aussi celui-ci
     RELEVAGE.enCours = true;
+    var gen = RELEVAGE.generation;
 
     var debut = Date.now(), calmes = 0;
     (function verifier() {
+        if (gen !== RELEVAGE.generation) { return; } //évaluation annulée car le joueur à appuyé sur le bouton retour ou quitée
         var repos = QUILLES.every(function (q) { return quilleAuRepos(q.el); });
         calmes = repos ? calmes + 1 : 0;
         if (calmes >= 5 || Date.now() - debut > RELEVAGE.delaiMax) {
@@ -60,6 +63,12 @@ function evaluerLancer(callback) {
             setTimeout(verifier, 100);
         }
     })();
+}
+
+function annulerEvaluation() {
+    RELEVAGE.generation++;          // la boucle d'attente en cours s'arrête toute seule
+    RELEVAGE.callbacks = [];
+    RELEVAGE.enCours = false;
 }
 
 function releverLesQuilles() {
@@ -178,6 +187,17 @@ function UpdateScore(numeros){
     }
 }
 
+function afficherBoutonsPartie(visible) {
+    ['#btn-recommencer', '#btn-quitter'].forEach(function (s) {
+        var b = document.querySelector(s);
+        if (!b) { return; }
+        b.setAttribute('visible', visible);
+        var suivi = b.components['suivre-joueur'];
+        if (visible && suivi) { suivi.replacer(); }          // apparaît d'un coup à côté du joueur
+    });
+}
+
+
 var scene = document.querySelector('a-scene');
 
 // ===================== NIVEAUX =====================
@@ -233,6 +253,8 @@ function afficherEntete() {
 }
 
 function ouvrirMenu() {
+    annulerEvaluation();                                                   
+    document.querySelector('#baton').components.baton.reinitialiser();
     etat = 'menu';
     scoreJeu = 0; rates = 0; lances = 0; termine = false; historiqueLancers = [];
     chrono.emit('chrono-reset'); chronoActif = false;
@@ -246,9 +268,12 @@ function ouvrirMenu() {
         { texte: 'Choisis ton niveau', taille: 0.13 }
     ] });
     afficherEntete();
+    afficherBoutonsPartie(false);
 }
 
 function demarrerPartie(cle) {
+    annulerEvaluation();                                                   
+    document.querySelector('#baton').components.baton.reinitialiser();
     niveauCourant = cle;
     etat = 'partie';
     termine = false;
@@ -262,6 +287,7 @@ function demarrerPartie(cle) {
     scene.emit('score-mis-a-jour', { total: 0, dernier: null, rates: 0, lances: 0 });
     afficherEntete();
     document.querySelector('#baton').setAttribute('baton', 'actif', true);
+    afficherBoutonsPartie(true);
 }
 
 function recommencer() { demarrerPartie(niveauCourant); }   // même niveau
@@ -275,6 +301,7 @@ Object.keys(NIVEAUX).forEach(function (cle) {
 scene.addEventListener('loaded', ouvrirMenu);
 
 function finDePartie(gagne) {
+    afficherBoutonsPartie(false);
     termine = true;
     etat = 'fin';
     chrono.emit('chrono-stop');
@@ -498,6 +525,29 @@ AFRAME.registerComponent('baton', {
                 THREE.MathUtils.degToRad(r.y),
                 THREE.MathUtils.degToRad(r.z)
             )
+        );
+    },
+
+    reinitialiser: function () {
+        clearTimeout(this.minuteur);
+        this.minuteur = null;
+
+        if (this.porteur) {                                       // la quille est encore dans une main
+            this.porteur.removeEventListener('lancer', this.lancer);
+            this.porteur = null;
+            this.el.sceneEl.object3D.add(this.el.object3D);       // elle quitte la main
+        }
+        this.vitesseImposee = null;
+
+        this.el.removeAttribute('dynamic-body');
+        this.el.setAttribute('position', { x: this.posInit.x, y: this.posInit.y, z: this.posInit.z });
+        this.el.setAttribute('rotation', { x: this.rotInit.x, y: this.rotInit.y, z: this.rotInit.z });
+        // pose directe aussi : A-Frame peut ignorer un setAttribute identique à l'ancienne valeur
+        this.el.object3D.position.set(this.posInit.x, this.posInit.y, this.posInit.z);
+        this.el.object3D.rotation.set(
+            THREE.MathUtils.degToRad(this.rotInit.x),
+            THREE.MathUtils.degToRad(this.rotInit.y),
+            THREE.MathUtils.degToRad(this.rotInit.z)
         );
     },
 

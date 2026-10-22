@@ -125,6 +125,17 @@
               hoverable clickable
               suivre-joueur="camera: #camera"></a-entity>
 
+    
+    <!-- Bouton pour arrêter en cours de partie -->
+     <a-entity id="btn-recommencer" class="bouton" visible="false"
+          bouton-vr="libelle: Recommencer; evenement: partie-recommencer; largeur: 0.3; hauteur: 0.1"
+          position="-1 1.45 0" 
+          rotation="0 90 0"></a-entity>
+
+    <a-entity id="btn-quitter" class="bouton" visible="false"
+              bouton-vr="libelle: Quitter; evenement: partie-quitter; largeur: 0.3; hauteur: 0.1; couleur: #8A3A3A; couleurSurvol: #B84A4A"
+              position="-1 1.3 0" 
+              rotation="0 90 0"></a-entity>
     <!-- ===================== LUMIÈRES ===================== -->
 
     <!-- Soleil de fin d'après-midi, derrière le joueur à gauche : les quilles sont éclairées de face.
