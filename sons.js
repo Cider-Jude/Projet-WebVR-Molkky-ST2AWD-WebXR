@@ -17,7 +17,7 @@
 var SONS = {
     intro:    { fichier: 'sons/intro.mp3',    volume: 0.6 },
     prise:    { fichier: 'sons/prise.mp3',    volume: 0.8 },
-    lancer:   { fichier: 'sons/lancer.mp3',   volume: 0.8 },
+    lancer:   { fichier: 'sons/SWSH_Whoosh 6 (ID 1799)_LaSonotheque.fr.mp3',   volume: 0.8 },
     touche:   { fichier: 'sons/touche.mp3',   volume: 0.9 },
     victoire: { fichier: 'sons/victoire.mp3', volume: 0.9 },
     defaite:  { fichier: 'sons/defaite.mp3',  volume: 0.9 }
@@ -32,9 +32,20 @@ var GestionSons = (function () {
         a.preload = 'auto';
         a.volume = SONS[nom].volume;
         a.addEventListener('error', function () {
-            console.warn('[sons] Fichier introuvable, son "' + nom + '" ignoré : ' + SONS[nom].fichier);
+            var code = a.error ? a.error.code : '?';
+            var message = a.error ? a.error.message : '';
+            console.warn('[sons] "' + nom + '" ignoré (code ' + code + ') ' + message + ' : ' + a.src);
+
+            // Distingue "fichier absent" de "fichier illisible"
+            fetch(a.src).then(function (r) {
+                console.warn('[sons] ' + nom + ' : le serveur répond ' + r.status + ' (type ' + r.headers.get('content-type') + ')');
+            }).catch(function () {
+                console.warn('[sons] ' + nom + ' : impossible de joindre le serveur');
+            });
+
             audios[nom] = null;
         });
+
         audios[nom] = a;
     });
 
@@ -59,6 +70,7 @@ var GestionSons = (function () {
 
 (function () {
     var scene = document.querySelector('a-scene');
+
 
     scene.addEventListener('partie-demarree', function () {
         GestionSons.arreter('victoire');
