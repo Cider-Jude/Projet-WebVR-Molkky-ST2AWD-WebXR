@@ -239,6 +239,7 @@ function demarrerPartie(cle) {
     scene.emit('score-mis-a-jour', { total: 0, dernier: null, rates: 0, lances: 0 });
     afficherEntete();
     document.querySelector('#baton').setAttribute('baton', 'actif', true);
+    scene.emit('partie-demarree');                   // son d'intro (sons.js)
 }
 
 function recommencer() { demarrerPartie(niveauCourant); }   // même niveau
@@ -265,6 +266,7 @@ function finDePartie(gagne) {
     chrono.emit('chrono-stop');
     document.querySelector('#baton').setAttribute('baton', 'actif', false);
     scene.emit('info-masquer');
+    scene.emit('partie-terminee', { gagne: gagne });   // son de victoire / défaite (sons.js)
 
     const chronometre = chrono.components.chronometre;
     const temps = chronometre.getTemps();
