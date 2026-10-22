@@ -38,7 +38,7 @@
   <div id="aide">
     <b>PC</b> — WASD / flèches : se déplacer · souris : viser la quille · <b>G</b> : prendre / lâcher · <b>clic</b> ou <b>Espace</b> : lancer<br>
     <b>VR</b> — joystick : se déplacer · <b>grip</b> : prendre la quille · <b>relâcher le grip en balançant le bras</b> : lancer<br>
-    <b>Facile</b> — la trajectoire prévue s'affiche quand tu tiens le bâton (orange = une quille sera touchée)
+    <b>Facile / Normale</b> — bleu : trajectoire prévue (orange = quille touchée) · blanc : lancer précédent
   </div>
 
   <a-scene shadow="type: pcfsoft" physics="driver: local; gravity: -9.8; debug: false;">
@@ -147,8 +147,9 @@
       shadow="cast: true">
     </a-cylinder>
 
-    <!-- Aide à la visée (niveau Facile) : trajectoire prévue du bâton tenu -->
+    <!-- Aides au lancer (Facile / Normale) : trajectoire prévue du bâton tenu, trace du lancer précédent -->
     <a-entity id="aide-visee" aide-visee="baton: #baton"></a-entity>
+    <a-entity id="trace-lancer" trace-lancer="baton: #baton"></a-entity>
 
 
     <!-- ===================== QUILLES CIBLES ===================== -->
@@ -205,6 +206,16 @@
       rotation="-90 0 0"
       width="30" height="30"
       color="#7BC8A4"
+      shadow="cast: false; receive: true">
+    </a-plane>
+
+    <!-- Ligne de lancer : les quilles sont placées à 3 / 3,5 / 4 m de cette ligne selon le niveau
+         (son z doit rester égal à LIGNE_LANCER dans Beta Test molky.js) -->
+    <a-plane id="ligne-lancer"
+      position="0 0.002 -0.25"
+      rotation="-90 0 0"
+      width="1.5" height="0.05"
+      color="#FFFFFF"
       shadow="cast: false; receive: true">
     </a-plane>
 

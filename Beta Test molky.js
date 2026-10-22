@@ -1,6 +1,7 @@
 var scoreJeu = 0; //le score globale du jeu
 var rates = 0; //Le nombre de coups ratés d'affilé
 var lances = 0; //Le nombre de fois que le joueur a lancé le bâton
+var historiqueLancers = []; // un objet par lancer : { numero, quilles, points, total }
 
 const chrono = document.querySelector('#chrono'); // le chronomètre
 var chronoActif = false; // le chrono s'active dès que le joueur prend le bâton en main pour la première fois
@@ -141,9 +142,6 @@ function replacerQuillesAuDepart() {
 }
 
 function UpdateScore(numeros){
-    if (rates == 3){
-        finDePartie(false);
-    } 
     var points = 0;
     if (numeros.length > 1){
         points = numeros.length;
@@ -152,26 +150,48 @@ function UpdateScore(numeros){
         if(numeros.length == 1){points = numeros[0];}
     }
     scoreJeu+=points
-    if (scoreJeu > 50){
+    var depasse = scoreJeu > 50;
+    if (depasse){
         scoreJeu = 25
+    }
+
+    // Chaque lancer est enregistré : numéro du lancer, quilles tombées, points obtenus, score total
+    historiqueLancers.push({ numero: lances, quilles: numeros.slice(), points: points, total: scoreJeu });
+
+    scene.emit('score-mis-a-jour', { total: scoreJeu, dernier: points, rates: rates, lances: lances });
+
+    // Un seul feedback par lancer, du plus important au moins important
+    if (rates == 3){
+        finDePartie(false);
+    }
+    else if (scoreJeu == 50){
+        finDePartie(true);
+    }
+    else if (depasse){
         scene.emit('info-afficher', { lignes: ['Vous avez plus de 50 points,', 'retour à 25'] });
     }
-    
-    if (scoreJeu == 50){
-        finDePartie(true); 
+    else if (points == 0){
+        scene.emit('info-afficher', { lignes: [
+            { texte: 'Raté ! Aucune quille tombée', couleur: '#FF8A8A' },
+            'Échecs consécutifs : ' + rates + ' / 3'
+        ] });
     }
-    
-    scene.emit('score-mis-a-jour', { total: scoreJeu, dernier: points, rates: rates, lances: lances });
 }
 
 var scene = document.querySelector('a-scene');
 
 // ===================== NIVEAUX =====================
+// distance        : de la ligne de lancer à la première rangée (m) ; consigne : environ 3 à 4 m
+// aideVisee       : trajectoire prévue du bâton tenu (aide-visee.js)
+// trace           : trace du lancer précédent (aide-visee.js)
+// graviteQuilles  : facteur de gravité des quilles (< 1 : plus faciles à faire tomber)
 var NIVEAUX = {
-    facile:    { nom: 'Facile',    distance: 1.5, ecart: 0.15, restitution: 0.05, aideVisee: true  },
-    normale:   { nom: 'Normale',   distance: 2.0, ecart: 0.05, restitution: 0.05, aideVisee: false },
-    difficile: { nom: 'Difficile', distance: 2.0, ecart: 0.01, restitution: 0.1,  aideVisee: false }
+    facile:    { nom: 'Facile',    distance: 3.0, ecart: 0.15, restitution: 0.05, aideVisee: true,  trace: true,  graviteQuilles: 1   },
+    normale:   { nom: 'Normale',   distance: 3.5, ecart: 0.05, restitution: 0.05, aideVisee: true,  trace: true,  graviteQuilles: 1   },
+    difficile: { nom: 'Difficile', distance: 4.0, ecart: 0.01, restitution: 0.1,  aideVisee: false, trace: false, graviteQuilles: 0.5 }
 };
+
+var LIGNE_LANCER = -0.25;   // z de la ligne de lancer au sol (même valeur que #ligne-lancer dans le HTML)
 
 // Place de chaque quille dans la formation : [colonne (en demi-pas), rangée]
 var DISPOSITION = {
@@ -191,11 +211,13 @@ function appliquerNiveau(cle) {
     var decalageRangee = pas * Math.sqrt(3) / 2;     // quilles en quinconce
     QUILLES.forEach(function (q) {
         var d = DISPOSITION[q.data.numero];
-        q.posInit = { x: d[0] * pas / 2, z: -(n.distance + d[1] * decalageRangee) };
+        q.posInit = { x: d[0] * pas / 2, z: LIGNE_LANCER - (n.distance + d[1] * decalageRangee) };
+        q.el.setAttribute('quille', 'gravite', n.graviteQuilles);
     });
     replacerQuillesAuDepart();
     document.querySelector('[sol-absorbant]').setAttribute('sol-absorbant', 'restitution', n.restitution);
     scene.emit('aide-visee', { active: n.aideVisee });   // écouté par le composant aide-visee (aide-visee.js)
+    scene.emit('trace-lancer', { active: n.trace });     // écouté par le composant trace-lancer (aide-visee.js)
 }
 
 function afficherEntete() {
@@ -212,7 +234,7 @@ function afficherEntete() {
 
 function ouvrirMenu() {
     etat = 'menu';
-    scoreJeu = 0; rates = 0; lances = 0; termine = false;
+    scoreJeu = 0; rates = 0; lances = 0; termine = false; historiqueLancers = [];
     chrono.emit('chrono-reset'); chronoActif = false;
     document.querySelector('#baton').setAttribute('baton', 'actif', false);
     scene.emit('fin-masquer');
@@ -231,6 +253,7 @@ function demarrerPartie(cle) {
     etat = 'partie';
     termine = false;
     scoreJeu = 0; rates = 0; lances = 0;             // scoreJeu : c'est bien lui qu'il faut remettre à zéro
+    historiqueLancers = [];
     chrono.emit('chrono-reset'); chronoActif = false;
     appliquerNiveau(cle);
     scene.emit('menu-masquer');
@@ -266,6 +289,7 @@ function finDePartie(gagne) {
         const nouveauRecord = enregistrerSiRecord(niveauCourant, lances, temps);
         const lignes = [
             { texte: 'Vous avez gagné !', taille: 0.16, couleur: '#8EF0B0' },
+            { texte: 'Score final : ' + scoreJeu, taille: 0.12 },
             { texte: 'Nombre de tir : ' + lances, taille: 0.12 },
             { texte: 'Temps : ' + tempsTexte, taille: 0.12 }
         ];
@@ -277,6 +301,7 @@ function finDePartie(gagne) {
     } else {
         scene.emit('fin-afficher', { lignes: [
             { texte: 'Vous avez raté 3 fois de suite, vous avez perdu la partie', taille: 0.1, couleur: '#FF8A8A' },
+            { texte: 'Score final : ' + scoreJeu, taille: 0.12 },
             { texte: 'Nombre de tir : ' + lances, taille: 0.12 },
             { texte: 'Temps : ' + tempsTexte, taille: 0.12 }
         ] });
@@ -940,6 +965,11 @@ AFRAME.registerComponent('quille', {
 
         couleurChiffre: {
             default: '#030100'
+        },
+
+        // Facteur de gravité de la quille (1 = normale, 0.5 = deux fois moins lourde)
+        gravite: {
+            default: 1
         }
     },
 
@@ -977,12 +1007,24 @@ AFRAME.registerComponent('quille', {
             QUILLES.push(this);
         }
 
+        // Le système physique appellera beforeStep() avant chaque pas de simulation
+        this.el.sceneEl.systems.physics.addComponent(this);
+
         // Petit filet de sécurité pour les cas où le body
         // est déjà présent au moment de l'initialisation.
         setTimeout(this.construireSiPossible, 0);
     },
 
     
+
+    // Gravité réduite : une force vers le haut compense une partie du poids.
+    // Les forces sont remises à zéro après chaque pas, il faut donc la réappliquer à chaque fois.
+    beforeStep: function () {
+        var b = this.el.body;
+        if (!b || this.data.gravite === 1) { return; }
+        var g = this.el.sceneEl.systems.physics.driver.world.gravity;
+        b.force.y += b.mass * g.y * (this.data.gravite - 1);
+    },
 
     surMesh: function (evt) {
         if (
@@ -1425,6 +1467,7 @@ AFRAME.registerComponent('quille', {
 
         var k = QUILLES.indexOf(this);
         if (k >= 0) { QUILLES.splice(k, 1); }
+        this.el.sceneEl.systems.physics.removeComponent(this);
 
         this.el.removeEventListener(
             'body-loaded',
