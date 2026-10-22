@@ -37,10 +37,13 @@
 
   <div id="aide">
     <b>PC</b> — WASD / flèches : se déplacer · souris : viser la quille · <b>G</b> : prendre / lâcher · <b>clic</b> ou <b>Espace</b> : lancer<br>
-    <b>VR</b> — joystick : se déplacer · <b>grip</b> : prendre la quille · <b>relâcher le grip en balançant le bras</b> : lancer
+    <b>VR</b> — joystick : se déplacer · <b>grip</b> : prendre la quille · <b>relâcher le grip en balançant le bras</b> : lancer<br>
+    <b>Facile / Normale</b> — bleu : trajectoire prévue (orange = quille touchée) · blanc : lancer précédent
   </div>
 
-  <a-scene shadow="type: pcfsoft" physics="driver: local; gravity: -9.8; debug: false;">
+  <!-- fog : même couleur que l'horizon du ciel (composant `ciel`, decor.js) -->
+  <a-scene shadow="type: pcfsoft" physics="driver: local; gravity: -9.8; debug: false;"
+           fog="type: linear; color: #D6E9F5; near: 20; far: 140">
 
     <a-assets>
       <!--
@@ -50,6 +53,10 @@
       <a-mixin id="main-vr"
         sphere-collider="objects: .saisissable, .bouton; radius: 0.04"
         super-hands="grabStartButtons: gripdown; grabEndButtons: gripup"></a-mixin>
+
+      <!-- Bois du mobilier (planche de lancer, socle, chevalet, panneau) -->
+      <a-mixin id="bois" material="color: #A0703F; roughness: 0.9"></a-mixin>
+      <a-mixin id="bois-fonce" material="color: #5E3D24; roughness: 0.9"></a-mixin>
     </a-assets>
     
     <a-assets>
@@ -120,12 +127,20 @@
 
     <!-- ===================== LUMIÈRES ===================== -->
 
-    <a-entity
-      light="type: directional; color: #FFFFFF; intensity: 0.8; castShadow: true"
-      position="-2 4 2">
+    <!-- Soleil de fin d'après-midi, derrière le joueur à gauche : les quilles sont éclairées de face.
+         Le ciel place son disque solaire dans la direction cible -> soleil.
+         La zone d'ombre (shadowCamera...) couvre tout le terrain, jusqu'aux quilles du niveau Difficile. -->
+    <a-entity id="cible-soleil" position="0 0 -2.5"></a-entity>
+    <a-entity id="soleil"
+      light="type: directional; color: #FFF1DA; intensity: 1.1; castShadow: true; target: #cible-soleil;
+             shadowMapWidth: 2048; shadowMapHeight: 2048; shadowBias: -0.0005;
+             shadowCameraLeft: -5; shadowCameraRight: 5; shadowCameraTop: 5; shadowCameraBottom: -5;
+             shadowCameraNear: 1; shadowCameraFar: 30"
+      position="-5 6.5 3">
     </a-entity>
 
-    <a-entity light="type: ambient; color: #BBBBBB; intensity: 0.5"></a-entity>
+    <!-- Lumière d'ambiance : bleutée venant du ciel, verte renvoyée par la pelouse -->
+    <a-entity light="type: hemisphere; color: #CFE6FF; groundColor: #6B8F4E; intensity: 0.8"></a-entity>
 
     <!-- ===================== LA QUILLE À LANCER ===================== -->
     <!--
@@ -142,9 +157,13 @@
       position="0 0.975 -0.7"
       radius="0.03" height="0.15"
       segments-radial="16"
-      color="#E0B070"
+      color="#A86B3A" roughness="0.75"
       shadow="cast: true">
     </a-cylinder>
+
+    <!-- Aides au lancer (Facile / Normale) : trajectoire prévue du bâton tenu, trace du lancer précédent -->
+    <a-entity id="aide-visee" aide-visee="baton: #baton"></a-entity>
+    <a-entity id="trace-lancer" trace-lancer="baton: #baton"></a-entity>
 
 
     <!-- ===================== QUILLES CIBLES ===================== -->
@@ -153,56 +172,50 @@
     <!-- Rangée 1 (devant) : 1 2 -->
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.10"
                 quille="numero: 1" position="-0.035 0.075 -3." radius="0.03" height="0.15" segments-radial="16"
-                color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
+                color="#E3C38F" roughness="0.8" shadow="cast: true; receive: true"></a-cylinder>
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.10"
                 quille="numero: 2" position="0.035 0.075 -3." radius="0.03" height="0.15" segments-radial="16"
-                color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
+                color="#E3C38F" roughness="0.8" shadow="cast: true; receive: true"></a-cylinder>
 
     <!-- Rangée 2 : 3 10 4 -->
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.10"
                 quille="numero: 3" position="-0.07 0.075 -3.061" radius="0.03" height="0.15" segments-radial="16"
-                color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
+                color="#E3C38F" roughness="0.8" shadow="cast: true; receive: true"></a-cylinder>
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.10"
                 quille="numero: 10" position="0 0.075 -3.061" radius="0.03" height="0.15" segments-radial="16"
-                color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
+                color="#E3C38F" roughness="0.8" shadow="cast: true; receive: true"></a-cylinder>
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.10"
                 quille="numero: 4" position="0.07 0.075 -3.061" radius="0.03" height="0.15" segments-radial="16"
-                color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
+                color="#E3C38F" roughness="0.8" shadow="cast: true; receive: true"></a-cylinder>
 
     <!-- Rangée 3 : 5 11 12 6 -->
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.10"
                 quille="numero: 5" position="-0.105 0.075 -3.122" radius="0.03" height="0.15" segments-radial="16"
-                color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
+                color="#E3C38F" roughness="0.8" shadow="cast: true; receive: true"></a-cylinder>
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.10"
                 quille="numero: 11" position="-0.035 0.075 -3.122" radius="0.03" height="0.15" segments-radial="16"
-                color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
+                color="#E3C38F" roughness="0.8" shadow="cast: true; receive: true"></a-cylinder>
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.10"
                 quille="numero: 12" position="0.035 0.075 -3.122" radius="0.03" height="0.15" segments-radial="16"
-                color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
+                color="#E3C38F" roughness="0.8" shadow="cast: true; receive: true"></a-cylinder>
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.10"
                 quille="numero: 6" position="0.105 0.075 -3.122" radius="0.03" height="0.15" segments-radial="16"
-                color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
+                color="#E3C38F" roughness="0.8" shadow="cast: true; receive: true"></a-cylinder>
 
     <!-- Rangée 4 (fond) : 7 9 8 -->
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.10"
                 quille="numero: 7" position="-0.07 0.075 -3.183" radius="0.03" height="0.15" segments-radial="16"
-                color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
+                color="#E3C38F" roughness="0.8" shadow="cast: true; receive: true"></a-cylinder>
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.10"
                 quille="numero: 9" position="0 0.075 -3.183" radius="0.03" height="0.15" segments-radial="16"
-                color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
+                color="#E3C38F" roughness="0.8" shadow="cast: true; receive: true"></a-cylinder>
     <a-cylinder class="quille" dynamic-body="shape: cylinder; cylinderAxis: y; mass: 0.10"
                 quille="numero: 8" position="0.07 0.075 -3.183" radius="0.03" height="0.15" segments-radial="16"
-                color="#C97B4A" shadow="cast: true; receive: true"></a-cylinder>
+                color="#E3C38F" roughness="0.8" shadow="cast: true; receive: true"></a-cylinder>
 
     <!-- ===================== SOL ===================== -->
-    <!-- Partie visible -->
-    <a-plane
-      position="0 0 -4"
-      rotation="-90 0 0"
-      width="30" height="30"
-      color="#7BC8A4"
-      shadow="cast: false; receive: true">
-    </a-plane>
+    <!-- Partie visible : pelouse tondue en bandes (decor.js) -->
+    <a-entity pelouse></a-entity>
 
     <!--
       Collision du sol, volontairement séparée du visuel : une boîte invisible
@@ -211,6 +224,48 @@
     -->
     <a-box static-body visible="false" sol-absorbant="friction: 0.8; restitution: 0.05"
            position="0 -0.5 -4" width="30" height="1" depth="30"></a-box>
+
+    <!-- ===================== MOBILIER EN BOIS (visuel seulement, sans collision) ===================== -->
+
+    <!-- Ligne de lancer : une planche. Les quilles sont placées à 3 / 3,5 / 4 m de cette ligne selon le niveau
+         (son z doit rester égal à LIGNE_LANCER dans Beta Test molky.js) -->
+    <a-box id="ligne-lancer" mixin="bois"
+      position="0 0.02 -0.25" width="1.6" height="0.04" depth="0.08"
+      shadow="cast: true; receive: true"></a-box>
+
+    <!-- Socle du bâton : petit guéridon dont le plateau est à y = 0.9, sous le bâton (bois foncé pour que le bâton ressorte) -->
+    <a-entity id="socle" position="0 0 -0.7">
+      <a-cylinder mixin="bois-fonce" position="0 0.015 0" radius="0.14" height="0.03" shadow="cast: true; receive: true"></a-cylinder>
+      <a-cylinder mixin="bois-fonce" position="0 0.45 0" radius="0.022" height="0.86" shadow="cast: true"></a-cylinder>
+      <a-cylinder mixin="bois-fonce" position="0 0.89 0" radius="0.07" height="0.02" shadow="cast: true; receive: true"></a-cylinder>
+    </a-entity>
+
+    <!-- Chevalet du tableau des scores : mêmes position et rotation que le tableau (sa largeur suit l'axe z local) -->
+    <a-entity position="-1.5 0 -1" rotation="0 135 0">
+      <a-box mixin="bois-fonce" position="0.04 0.86 0.55" width="0.05" height="1.72" depth="0.05" shadow="cast: true"></a-box>
+      <a-box mixin="bois-fonce" position="0.04 0.86 -0.55" width="0.05" height="1.72" depth="0.05" shadow="cast: true"></a-box>
+      <a-box mixin="bois-fonce" position="0.04 0.02 0.55" width="0.35" height="0.04" depth="0.06" shadow="cast: true"></a-box>
+      <a-box mixin="bois-fonce" position="0.04 0.02 -0.55" width="0.35" height="0.04" depth="0.06" shadow="cast: true"></a-box>
+    </a-entity>
+
+    <!-- Panneau du chronomètre, derrière les textes "Prends ton temps" / temps (ils font environ 1,8 m de large) -->
+    <a-entity position="2.04 0 0" rotation="0 -90 0">
+      <a-box mixin="bois-fonce" position="0 1.7 0" width="2" height="0.56" depth="0.03" shadow="cast: true"></a-box>
+      <a-box mixin="bois-fonce" position="-0.85 0.72 0.03" width="0.06" height="1.44" depth="0.04" shadow="cast: true"></a-box>
+      <a-box mixin="bois-fonce" position="0.85 0.72 0.03" width="0.06" height="1.44" depth="0.04" shadow="cast: true"></a-box>
+    </a-entity>
+
+    <!-- Coin pique-nique, derrière le joueur à gauche -->
+    <a-entity position="-2.3 0 1.5" rotation="0 25 0">
+      <a-entity nappe-carreaux="largeur: 1.6; profondeur: 1.2"></a-entity>
+      <a-box position="0.3 0.13 -0.1" width="0.42" height="0.24" depth="0.3"
+             color="#B98D4F" roughness="1" shadow="cast: true; receive: true"></a-box>
+      <a-torus position="0.3 0.25 -0.1" radius="0.15" radius-tubular="0.012" arc="180"
+               color="#8A6334" roughness="1" shadow="cast: true"></a-torus>
+      <a-sphere position="-0.35 0.04 0.2" radius="0.04" color="#C9302C" roughness="0.4" shadow="cast: true"></a-sphere>
+      <a-sphere position="-0.27 0.04 0.28" radius="0.04" color="#7DB33A" roughness="0.4" shadow="cast: true"></a-sphere>
+      <a-sphere position="-0.42 0.04 0.32" radius="0.04" color="#C9302C" roughness="0.4" shadow="cast: true"></a-sphere>
+    </a-entity>
 
     <!-- ===================== RIG + CAMÉRA + CONTRÔLEURS ===================== -->
 
@@ -244,12 +299,18 @@
 
     </a-entity>
 
-    <a-sky color="#ECECEC"></a-sky>
+    <!-- ===================== DÉCOR (decor.js) ===================== -->
+    <a-entity ciel="lumiere: #soleil"></a-entity>
+    <a-entity collines></a-entity>
+    <a-entity nuages></a-entity>
+    <a-entity vegetation></a-entity>
 
   </a-scene>
 
   <script src="Beta Test molky.js"></script>
   <script src="mouvement-retour.js"></script>
   <script src="Records.js"></script>
+  <script src="aide-visee.js"></script>
+  <script src="decor.js"></script>
 </body>
 </html>
