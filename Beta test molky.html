@@ -37,7 +37,8 @@
 
   <div id="aide">
     <b>PC</b> — WASD / flèches : se déplacer · souris : viser la quille · <b>G</b> : prendre / lâcher · <b>clic</b> ou <b>Espace</b> : lancer<br>
-    <b>VR</b> — joystick : se déplacer · <b>grip</b> : prendre la quille · <b>relâcher le grip en balançant le bras</b> : lancer
+    <b>VR</b> — joystick : se déplacer · <b>grip</b> : prendre la quille · <b>relâcher le grip en balançant le bras</b> : lancer<br>
+    <b>Facile</b> — la trajectoire prévue s'affiche quand tu tiens le bâton (orange = une quille sera touchée)
   </div>
 
   <a-scene shadow="type: pcfsoft" physics="driver: local; gravity: -9.8; debug: false;">
@@ -146,6 +147,9 @@
       shadow="cast: true">
     </a-cylinder>
 
+    <!-- Aide à la visée (niveau Facile) : trajectoire prévue du bâton tenu -->
+    <a-entity id="aide-visee" aide-visee="baton: #baton"></a-entity>
+
 
     <!-- ===================== QUILLES CIBLES ===================== -->
     <!-- Quilles debout, posées pile sur le sol (y = hauteur / 2) et espacées
@@ -251,5 +255,6 @@
   <script src="Beta Test molky.js"></script>
   <script src="mouvement-retour.js"></script>
   <script src="Records.js"></script>
+  <script src="aide-visee.js"></script>
 </body>
 </html>

@@ -1,4 +1,9 @@
-const CLE_RECORD = 'monjeu-record';   
+const CLE_RECORD = 'monjeu-record';
+
+// Une clé localStorage par niveau : 'monjeu-record-facile', 'monjeu-record-normale', ...
+function cleRecord(niveau) {
+  return CLE_RECORD + '-' + niveau;
+}
 
 // Renvoie { lances, temps } ou null s'il n'y a pas encore de record
 function lireRecord(niveau) {

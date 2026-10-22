@@ -195,7 +195,7 @@ function appliquerNiveau(cle) {
     });
     replacerQuillesAuDepart();
     document.querySelector('[sol-absorbant]').setAttribute('sol-absorbant', 'restitution', n.restitution);
-    scene.emit('aide-visee', { active: n.aideVisee });   // à brancher quand l'aide à la visée existera
+    scene.emit('aide-visee', { active: n.aideVisee });   // écouté par le composant aide-visee (aide-visee.js)
 }
 
 function afficherEntete() {
@@ -250,14 +250,6 @@ Object.keys(NIVEAUX).forEach(function (cle) {
     });
 });
 scene.addEventListener('loaded', ouvrirMenu);
-
-function afficherEntete() {
-    const r = lireRecord();
-    const texte = r === null
-        ? 'Aucun record'
-        : 'Record : ' + r.lances + ' tirs en ' + chrono.components.chronometre.formater(r.temps);
-    scene.emit('entete-afficher', { lignes: ['Niveau : Normale  |  ' + texte] });
-}
 
 function finDePartie(gagne) {
     termine = true;
@@ -607,16 +599,10 @@ AFRAME.registerComponent('baton', {
         return v;
     },
 
-    // Test PC : lancer vers l'avant de la caméra,
+    // Test PC : vitesse du lancer au clic, vers l'avant de la caméra,
     // avec une petite cloche.
-    lancer: function () {
-        var main = this.porteur;
-
-        if (!main) {
-            return;
-        }
-
-        main.object3D.getWorldQuaternion(this.quat);
+    vitesseLancerPC: function () {
+        this.porteur.object3D.getWorldQuaternion(this.quat);
 
         var dir = new THREE.Vector3(0, 0, -1)
             .applyQuaternion(this.quat);
@@ -624,9 +610,29 @@ AFRAME.registerComponent('baton', {
         dir.y += 0.25;
         dir.normalize();
 
-        this.vitesseImposee = dir.multiplyScalar(
+        return dir.multiplyScalar(
             this.data.vitessePC
         );
+    },
+
+    // Vitesse qu'aurait le bâton s'il était lâché maintenant
+    // (utilisée par l'aide à la visée, voir aide-visee.js).
+    vitesseSiLache: function () {
+        if (this.porteur.components.camera) {
+            return this.vitesseLancerPC();
+        }
+        return this.calculerVitesse();
+    },
+
+    // Test PC : lancer vers l'avant de la caméra.
+    lancer: function () {
+        var main = this.porteur;
+
+        if (!main) {
+            return;
+        }
+
+        this.vitesseImposee = this.vitesseLancerPC();
 
         main.emit('prise-fin');
     },
