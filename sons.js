@@ -5,7 +5,7 @@
     événements que le jeu émet déjà sur la scène :
 
       - 'partie-demarree'  -> intro     (début d'une partie)
-      - 'baton-touche-quille' -> impact (choc du bâton sur une quille, volume selon la vitesse)
+      - 'baton-touche-quille' -> impact spatial (position du choc, volume selon vitesse et distance)
       - 'baton-pris'       -> prise     (le joueur récupère le bâton)
       - 'baton-lache'      -> lancer    (le joueur jette le bâton)
       - 'lancer-termine'   -> touche    (le lancer a fait tomber des quilles)
@@ -65,27 +65,52 @@ var GestionSons = (function () {
         vitesseMax: 6,        // m/s : à partir de cette vitesse, volume maximal
         volumeMin: 0.15,      // volume des chocs les plus faibles
         pitchMin: 0.9,        // variation de hauteur aléatoire (évite l'effet répétitif)
-        pitchMax: 1.1
+        pitchMax: 1.1,
+        distanceReference: 1, // distance en mètres où le volume est celui configuré
+        distanceMax: 20,      // distance maximale de propagation en mètres
+        attenuation: 1        // intensité de la baisse de volume avec la distance
     };
 
-    // Joue le son d'impact, plus ou moins fort selon la vitesse du choc.
-    // On joue une COPIE de l'audio pour que plusieurs chocs rapprochés
-    // (plusieurs quilles touchées d'un coup) puissent se superposer.
-    function jouerImpact(vitesse) {
+    // Chaque impact a sa propre source 3D afin que les chocs rapprochés se superposent.
+    function jouerImpact(vitesse, position) {
         var base = audios.impact;
-        if (!base) { return; }
+        if (!base || !position) { return; }
 
         var force = Math.min(Math.max(vitesse / IMPACT.vitesseMax, 0), 1);
-        var a = base.cloneNode();
-        a.volume = SONS.impact.volume * (IMPACT.volumeMin + (1 - IMPACT.volumeMin) * force);
+        var pitch = IMPACT.pitchMin + Math.random() * (IMPACT.pitchMax - IMPACT.pitchMin);
+        var source = document.createElement('a-sound');
+        source.setAttribute('position', {
+            x: position.x,
+            y: position.y,
+            z: position.z
+        });
 
-        a.preservesPitch = false;            // pour que playbackRate change aussi la hauteur
-        a.mozPreservesPitch = false;
-        a.webkitPreservesPitch = false;
-        a.playbackRate = IMPACT.pitchMin + Math.random() * (IMPACT.pitchMax - IMPACT.pitchMin);
+        source.addEventListener('sound-loaded', function () {
+            var component = source.components.sound;
+            if (!component) {
+                console.error('[sons] composant sound absent sur la source d’impact');
+                return;
+            }
+            component.playSound(function (audio) {
+                audio.setPlaybackRate(pitch);
+            });
+        }, { once: true });
 
-        var p = a.play();
-        if (p && p.catch) { p.catch(function () {}); }
+        source.addEventListener('sound-ended', function () {
+            if (source.parentNode) { source.parentNode.removeChild(source); }
+        }, { once: true });
+
+        source.setAttribute('sound', {
+            src: 'url(' + SONS.impact.fichier + ')',
+            autoplay: false,
+            positional: true,
+            distanceModel: 'inverse',
+            refDistance: IMPACT.distanceReference,
+            maxDistance: IMPACT.distanceMax,
+            rolloffFactor: IMPACT.attenuation,
+            volume: SONS.impact.volume * (IMPACT.volumeMin + (1 - IMPACT.volumeMin) * force)
+        });
+        document.querySelector('a-scene').appendChild(source);
     }
 
     function arreter(nom) {
@@ -101,7 +126,7 @@ var GestionSons = (function () {
 (function () {
     var scene = document.querySelector('a-scene');
     scene.addEventListener('baton-touche-quille', function (e) {
-        GestionSons.jouerImpact(e.detail.vitesse);
+        GestionSons.jouerImpact(e.detail.vitesse, e.detail.position);
     });
 
 
