@@ -126,9 +126,9 @@ var GestionSons = (function () {
 
 (function () {
     var scene = document.querySelector('a-scene');
-    scene.addEventListener('load', function (){
+    /*scene.addEventListener('load', function (){
         GestionSons.jouer('ambiance');
-    });
+    });*/ // à ajouter pour l'ambiance
     scene.addEventListener('baton-touche-quille', function (e) {
         GestionSons.jouerImpact(e.detail.vitesse, e.detail.position);
     });
