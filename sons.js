@@ -17,12 +17,13 @@
 
 var SONS = {
     intro:    { fichier: 'sons/intro.mp3',    volume: 0.6 },
-    prise:    { fichier: 'sons/prise.mp3',    volume: 0.8 },
+    prise:    { fichier: 'sons/WOODImpt_Marteau de president 1 coup (ID 1588)_LaSonotheque.fr.mp3',    volume: 0.6 },
     lancer:   { fichier: 'sons/SWSH_Whoosh 6 (ID 1799)_LaSonotheque.fr.mp3',   volume: 0.8 },
     touche:   { fichier: 'sons/touche.mp3',   volume: 0.9 },
     impact:   { fichier: 'sons/WOODImpt_Marteau de president 1 coup (ID 1588)_LaSonotheque.fr.mp3', volume: 1 },
     victoire: { fichier: 'sons/victoire.mp3', volume: 0.9 },
-    defaite:  { fichier: 'sons/defaite.mp3',  volume: 0.9 }
+    defaite:  { fichier: 'sons/defaite.mp3',  volume: 0.9 },
+    ambiance:  { fichier: 'sons/ambiance.mp3',  volume: 0.9 },
 };
 
 var GestionSons = (function () {
@@ -125,6 +126,9 @@ var GestionSons = (function () {
 
 (function () {
     var scene = document.querySelector('a-scene');
+    scene.addEventListener('load', function (){
+        GestionSons.jouer('ambiance');
+    });
     scene.addEventListener('baton-touche-quille', function (e) {
         GestionSons.jouerImpact(e.detail.vitesse, e.detail.position);
     });
