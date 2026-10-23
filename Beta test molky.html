@@ -59,13 +59,10 @@
       <a-mixin id="bois-fonce" material="color: #5E3D24; roughness: 0.9"></a-mixin>
     </a-assets>
     
-    <a-assets>
-        <a-asset-item id="black-board" src="models/board_school/board.glb"></a-asset-item>
-    </a-assets>
 
     <!--Affichage des points-->
 
-    <a-entity gltf-model="#black-board"
+    <a-entity gltf-model="url(models/board_school/board.glb)"
           position="-1.5 1.5 -1"
           rotation="0 135 0"
           scale="0.4 0.4 0.4"
@@ -165,6 +162,7 @@
       class="saisissable"
       hoverable
       baton 
+      choc-baton
       position="0 0.975 -0.7"
       radius="0.03" height="0.15"
       segments-radial="16"
@@ -321,6 +319,7 @@
   <script src="Beta Test molky.js"></script>
   <script src="mouvement-retour.js"></script>
   <script src="Records.js"></script>
+  <script src="sons.js"></script>
   <script src="aide-visee.js"></script>
   <script src="decor.js"></script>
 </body>
