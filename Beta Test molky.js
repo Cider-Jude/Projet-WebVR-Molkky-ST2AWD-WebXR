@@ -1798,13 +1798,17 @@ AFRAME.registerComponent('bouton-vr', {
         hauteur: { default: 0.18 },
         couleur: { default: '#2F6F4F' },
         couleurSurvol: { default: '#3FA56F' },
-        couleurTexte: { default: '#FFFFFF' }
+        couleurTexte: { default: '#FFFFFF' },
+        // Bouton inutilisable (et grisé) entre la prise du bâton ('baton-pris')
+        // et la fin du lancer ('lancer-termine') : évite d'appuyer dessus en lançant
+        bloquerPendantLancer: { default: true }
     },
 
     init: function () {
         var d = this.data;
         this.survol = false;
         this.enfonce = false;
+        this.bloque = false;
         this.dernierAppui = 0;
 
         this.canvas = document.createElement('canvas');
@@ -1817,18 +1821,25 @@ AFRAME.registerComponent('bouton-vr', {
         if (rendu) { this.texture.anisotropy = rendu.capabilities.getMaxAnisotropy(); }
 
         this.materiau = new THREE.MeshBasicMaterial({ map: this.texture, transparent: true });
-        var plan = new THREE.Mesh(new THREE.PlaneGeometry(d.largeur, d.hauteur), this.materiau);              
+        var plan = new THREE.Mesh(new THREE.PlaneGeometry(d.largeur, d.hauteur), this.materiau);
+        // Un bouton caché ne doit pas arrêter le rayon de la souris / du laser :
+        // sinon il « vole » le clic d'un bouton visible situé derrière lui
+        var bouton = this;
+        plan.raycast = function (raycaster, intersections) {
+            if (bouton.estVisible()) { THREE.Mesh.prototype.raycast.call(this, raycaster, intersections); }
+        };
         this.el.setObject3D('mesh', plan);
 
         this.surSurvol = function (evt) {
-            if (!this.estVisible()) { return; }
+            if (!this.estVisible() || this.bloque) { return; }
             evt.preventDefault();               // survol accepté, seulement si visible (remplace hoverable)
             this.survol = true; this.dessiner();
         }.bind(this);
         this.surFinSurvol = function () { this.survol = false; this.dessiner(); }.bind(this);
         this.surClic = function () { this.appuyer(); }.bind(this);           // souris (PC)
         this.surPrise = function (evt) {
-            if (!this.estVisible()) { return; }
+            // pas de preventDefault : super-hands refuse la saisie et la main reste libre
+            if (!this.estVisible() || this.bloque) { return; }
             var main = evt.detail && evt.detail.hand;
             // en VR, la main doit être contre la plaque ; sur PC (la caméra sert de main), pas de test
             if (main && !main.components.camera && !this.mainSurLeBouton(main)) { return; }
@@ -1843,6 +1854,21 @@ AFRAME.registerComponent('bouton-vr', {
         this.surLache = function (evt) { evt.preventDefault(); };   // libère la main, sinon super-hands la croit encore occupée
         this.el.addEventListener('grab-end', this.surLache);
 
+        this.bloquer = function () { this.changerBlocage(true); }.bind(this);
+        this.debloquer = function () { this.changerBlocage(false); }.bind(this);
+        if (d.bloquerPendantLancer) {
+            this.el.sceneEl.addEventListener('baton-pris', this.bloquer);
+            this.el.sceneEl.addEventListener('lancer-termine', this.debloquer);
+        }
+
+        this.dessiner();
+    },
+
+    // Bloqué : plus de survol ni d'appui, et le bouton devient translucide
+    changerBlocage: function (bloque) {
+        this.bloque = bloque;
+        if (bloque) { this.survol = false; }
+        this.materiau.opacity = bloque ? 0.35 : 1;
         this.dessiner();
     },
 
@@ -1867,7 +1893,7 @@ AFRAME.registerComponent('bouton-vr', {
     },
 
     appuyer: function () {
-        if (!this.estVisible()) { return; }
+        if (!this.estVisible() || this.bloque) { return; }
         var maintenant = Date.now();
         if (maintenant - this.dernierAppui < 600) { return; }   // anti double déclenchement
         this.dernierAppui = maintenant;
@@ -1916,6 +1942,8 @@ AFRAME.registerComponent('bouton-vr', {
         this.el.removeEventListener('click', this.surClic);
         this.el.removeEventListener('grab-start', this.surPrise);
         this.el.removeEventListener('grab-end', this.surLache);
+        this.el.sceneEl.removeEventListener('baton-pris', this.bloquer);
+        this.el.sceneEl.removeEventListener('lancer-termine', this.debloquer);
         var plan = this.el.getObject3D('bouton');
         if (plan) {
             plan.geometry.dispose();
