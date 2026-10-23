@@ -5,6 +5,7 @@
     événements que le jeu émet déjà sur la scène :
 
       - 'partie-demarree'  -> intro     (début d'une partie)
+      - 'baton-touche-quille' -> impact (choc du bâton sur une quille, volume selon la vitesse)
       - 'baton-pris'       -> prise     (le joueur récupère le bâton)
       - 'baton-lache'      -> lancer    (le joueur jette le bâton)
       - 'lancer-termine'   -> touche    (le lancer a fait tomber des quilles)
@@ -19,6 +20,7 @@ var SONS = {
     prise:    { fichier: 'sons/prise.mp3',    volume: 0.8 },
     lancer:   { fichier: 'sons/SWSH_Whoosh 6 (ID 1799)_LaSonotheque.fr.mp3',   volume: 0.8 },
     touche:   { fichier: 'sons/touche.mp3',   volume: 0.9 },
+    impact:   { fichier: 'sons/WOODImpt_Marteau de president 1 coup (ID 1588)_LaSonotheque.fr.mp3', volume: 1 },
     victoire: { fichier: 'sons/victoire.mp3', volume: 0.9 },
     defaite:  { fichier: 'sons/defaite.mp3',  volume: 0.9 }
 };
@@ -58,6 +60,34 @@ var GestionSons = (function () {
         if (p && p.catch) { p.catch(function () {}); }
     }
 
+    // Réglages du son d'impact bâton / quille
+    var IMPACT = {
+        vitesseMax: 6,        // m/s : à partir de cette vitesse, volume maximal
+        volumeMin: 0.15,      // volume des chocs les plus faibles
+        pitchMin: 0.9,        // variation de hauteur aléatoire (évite l'effet répétitif)
+        pitchMax: 1.1
+    };
+
+    // Joue le son d'impact, plus ou moins fort selon la vitesse du choc.
+    // On joue une COPIE de l'audio pour que plusieurs chocs rapprochés
+    // (plusieurs quilles touchées d'un coup) puissent se superposer.
+    function jouerImpact(vitesse) {
+        var base = audios.impact;
+        if (!base) { return; }
+
+        var force = Math.min(Math.max(vitesse / IMPACT.vitesseMax, 0), 1);
+        var a = base.cloneNode();
+        a.volume = SONS.impact.volume * (IMPACT.volumeMin + (1 - IMPACT.volumeMin) * force);
+
+        a.preservesPitch = false;            // pour que playbackRate change aussi la hauteur
+        a.mozPreservesPitch = false;
+        a.webkitPreservesPitch = false;
+        a.playbackRate = IMPACT.pitchMin + Math.random() * (IMPACT.pitchMax - IMPACT.pitchMin);
+
+        var p = a.play();
+        if (p && p.catch) { p.catch(function () {}); }
+    }
+
     function arreter(nom) {
         var a = audios[nom];
         if (!a) { return; }
@@ -65,14 +95,13 @@ var GestionSons = (function () {
         a.currentTime = 0;
     }
 
-    return { jouer: jouer, arreter: arreter };
+    return { jouer: jouer, jouerImpact: jouerImpact, arreter: arreter };
 })();
 
 (function () {
     var scene = document.querySelector('a-scene');
     scene.addEventListener('baton-touche-quille', function (e) {
-        console.log('Choc sur la quille ' + e.detail.numero );
-        // plus tard : jouer le son ici
+        GestionSons.jouerImpact(e.detail.vitesse);
     });
 
 

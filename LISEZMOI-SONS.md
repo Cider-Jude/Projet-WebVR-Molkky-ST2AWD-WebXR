@@ -8,6 +8,7 @@ Créez un dossier `sons` à la racine du projet (à côté de `sons.js`) et dép
 | `prise.mp3`    | Quand le joueur récupère le bâton                          |
 | `lancer.mp3`   | Quand le joueur jette le bâton                             |
 | `touche.mp3`   | Quand le lancer fait tomber au moins une quille            |
+| `WOODImpt_Marteau de president 1 coup (ID 1588)_LaSonotheque.fr.mp3` | À chaque choc du bâton sur une quille (volume et hauteur variables selon la vitesse) |
 | `victoire.mp3` | Quand le joueur gagne (50 points)                          |
 | `defaite.mp3`  | Quand le joueur perd (3 lancers ratés d'affilée)           |
 
@@ -15,3 +16,5 @@ Un fichier manquant n'empêche pas le jeu de fonctionner : le son correspondant 
 (un avertissement apparaît dans la console du navigateur).
 
 Pour changer un nom de fichier ou un volume, modifiez l'objet `SONS` en haut de `sons.js`.
+
+Le son d'impact se règle dans l'objet `IMPACT` de `sons.js` (vitesse pour le volume maximal, volume minimal, variation de hauteur).
