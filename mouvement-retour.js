@@ -1,11 +1,11 @@
 // Deux composants A-Frame :
 //
 //  1) gestion-mouvement (à mettre sur le #rig)
-//     - événement "activer-mouvement" -> débloque movement-controls,
-//       cache le bouton d'activation et fait apparaître le bouton de retour
-//     - événement "retour-origine"    -> téléporte le rig au point choisi (0 0 0 par défaut),
-//       BLOQUE à nouveau le mouvement, cache le bouton de retour
-//       et réaffiche le bouton d'activation (le joueur doit rappuyer dessus pour rebouger)
+//     - le joueur peut se déplacer dès le départ (movement-controls d'aframe-extras)
+//     - anti-triche : le bâton ne se prend que depuis la ZONE DE LANCER (derrière la planche) ;
+//       hors de la zone, le bâton est désactivé et le bouton de retour apparaît à côté du joueur
+//     - pendant qu'il tient le bâton, le déplacement est bloqué (impossible d'avancer vers les quilles)
+//     - événement "retour-origine" -> téléporte le joueur au point de départ
 //
 //  2) suivre-joueur (à mettre sur le bouton de retour)
 //     - le bouton reste à côté du joueur (à gauche, à hauteur de poitrine) et se tourne vers lui.
@@ -13,75 +13,81 @@
 
 AFRAME.registerComponent('gestion-mouvement', {
   schema: {
-    boutonActiver: { type: 'string' },   // sélecteur CSS du bouton qui débloque le mouvement
     boutonRetour: { type: 'string' },    // sélecteur CSS du bouton qui suit le joueur
-    evenementActiver: { default: 'activer-mouvement' },
+    camera: { type: 'string', default: '#camera' },
     evenementRetour: { default: 'retour-origine' },
-    point: { type: 'vec3', default: { x: 0, y: 0, z: 0 } }   // destination de la téléportation
+    point: { type: 'vec3', default: { x: 0, y: 0, z: 0 } },   // destination de la téléportation
+
+    // Zone de lancer, mesurée sur la position de la tête, par rapport à la planche (LIGNE_LANCER) :
+    // un peu de marge devant la planche pour pouvoir se pencher vers le socle du bâton
+    demiLargeurZone: { default: 1.2 },
+    margeDevantLigne: { default: 0.3 },
+    profondeurZone: { default: 1.5 }
   },
 
   init: function () {
-    this.actif = false;   // true = le joueur peut bouger
-    this.activer = this.activer.bind(this);
+    this.dansZone = null;                // inconnu : la première image règle boutons et bâton
+    this.posTete = new THREE.Vector3();
+    this.camEl = null;
+    this.batonEl = null;
+
     this.retour = this.retour.bind(this);
+    this.bloquer = function () { this.el.setAttribute('movement-controls', 'enabled', false); }.bind(this);
+    this.debloquer = function () { this.el.setAttribute('movement-controls', 'enabled', true); }.bind(this);
 
     var scene = this.el.sceneEl;
-    scene.addEventListener(this.data.evenementActiver, this.activer);
     scene.addEventListener(this.data.evenementRetour, this.retour);
-
-    this.chrono = document.querySelector('#chrono').components.chronometre;
+    scene.addEventListener('baton-pris', this.bloquer);
+    scene.addEventListener('baton-lache', this.debloquer);
   },
 
-  activer: function () {
-    if (this.actif) { return; }
-    this.actif = true;
+  tick: function () {
+    if (!this.camEl) { this.camEl = document.querySelector(this.data.camera); }
+    if (!this.batonEl) { this.batonEl = document.querySelector('#baton'); }
+    if (!this.camEl || !this.batonEl) { return; }
 
-    // Débloque le déplacement (movement-controls d'aframe-extras)
-    this.el.setAttribute('movement-controls', 'enabled', true);
+    var d = this.data, p = this.posTete;
+    this.camEl.object3D.getWorldPosition(p);
+    var dansZone = Math.abs(p.x) <= d.demiLargeurZone &&
+                   p.z >= LIGNE_LANCER - d.margeDevantLigne &&
+                   p.z <= LIGNE_LANCER + d.profondeurZone;
 
-    var boutonActiver = document.querySelector(this.data.boutonActiver);
-    if (boutonActiver) { boutonActiver.setAttribute('visible', false); }
-
-    var boutonRetour = document.querySelector(this.data.boutonRetour);
-    if (boutonRetour) {
-      boutonRetour.setAttribute('visible', true);
-      var suivi = boutonRetour.components['suivre-joueur'];
-      if (suivi) { suivi.replacer(); }   // apparaît directement à côté du joueur
+    // Le bâton ne se prend que pendant une partie, depuis la zone de lancer
+    var actif = etat === 'partie' && dansZone;
+    if (this.batonEl.getAttribute('baton').actif !== actif) {
+      this.batonEl.setAttribute('baton', 'actif', actif);
     }
-    document.querySelector('#baton').setAttribute('baton', 'actif', false);
-    this.chrono.arreter();
-    this.el.emit('mouvement-active');
+
+    if (dansZone === this.dansZone) { return; }
+    var premiereImage = this.dansZone === null;
+    this.dansZone = dansZone;
+
+    // Hors de la zone : le bouton de retour apparaît à côté du joueur
+    var boutonRetour = document.querySelector(d.boutonRetour);
+    if (boutonRetour) {
+      boutonRetour.setAttribute('visible', !dansZone);
+      var suivi = boutonRetour.components['suivre-joueur'];
+      if (!dansZone && suivi) { suivi.replacer(); }
+    }
+    if (!dansZone && !premiereImage && etat === 'partie') {
+      this.el.sceneEl.emit('info-afficher', { lignes: ['Hors de la zone de lancer :', 'reviens derrière la planche pour lancer'] });
+    }
   },
 
   retour: function () {
-    if (!this.actif) { return; }
-    this.actif = false;
-
-    // Téléportation au point de départ
+    // On place le rig pour que la TÊTE arrive au point de départ
+    // (en VR, le joueur n'est pas forcément au centre de son espace de jeu)
     var p = this.data.point;
-    this.el.object3D.position.set(p.x, p.y, p.z);
-
-    // Le déplacement est bloqué à nouveau
-    this.el.setAttribute('movement-controls', 'enabled', false);
-
-    // Le bouton de retour disparaît, le bouton d'activation revient
-    var boutonRetour = document.querySelector(this.data.boutonRetour);
-    if (boutonRetour) { boutonRetour.setAttribute('visible', false); }
-
-    var boutonActiver = document.querySelector(this.data.boutonActiver);
-    if (boutonActiver) { boutonActiver.setAttribute('visible', true); }
-
-    document.querySelector('#baton').setAttribute('baton', 'actif', etat === 'partie');
+    var tete = this.camEl ? this.camEl.object3D.position : { x: 0, z: 0 };
+    this.el.object3D.position.set(p.x - tete.x, p.y, p.z - tete.z);
     this.el.emit('retour-effectue');
-    if(chronoActif){
-      this.chrono.demarrer();
-    }
   },
 
   remove: function () {
     var scene = this.el.sceneEl;
-    scene.removeEventListener(this.data.evenementActiver, this.activer);
     scene.removeEventListener(this.data.evenementRetour, this.retour);
+    scene.removeEventListener('baton-pris', this.bloquer);
+    scene.removeEventListener('baton-lache', this.debloquer);
   }
 });
 

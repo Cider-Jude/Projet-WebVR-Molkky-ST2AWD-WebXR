@@ -112,13 +112,7 @@
                 position="0.3 -0.5 0.25"></a-entity>
     </a-entity>
     
-    <!-- Bouton 1 : débloque le déplacement -->
-    <a-entity id="btn-activer" class="bouton"
-          bouton-vr="libelle: Activer le mouvement; evenement: activer-mouvement; largeur: 0.6"
-          hoverable clickable
-          position="1 1.3 0"
-          rotation="0 -90 0"></a-entity>
-    <!-- Bouton 2 : caché au départ, suit le joueur, téléporte au point 0 -->
+    <!-- Bouton de retour : apparaît quand le joueur sort de la zone de lancer, le suit, le téléporte au point 0 -->
     <!-- À mettre directement dans <a-scene>, pas dans le rig -->
     <a-entity id="btn-retour" class="bouton" visible="false"
               bouton-vr="libelle: Retour au départ; evenement: retour-origine; largeur: 0.4; hauteur: 0.14"
@@ -269,8 +263,9 @@
 
     <!-- ===================== RIG + CAMÉRA + CONTRÔLEURS ===================== -->
 
-    <a-entity id="rig" movement-controls="fly: false; speed: 0.15; enabled: false" 
-      gestion-mouvement="boutonActiver: #btn-activer; boutonRetour: #btn-retour"
+    <!-- Déplacement libre dès le départ ; le bâton ne se prend que depuis la zone de lancer (mouvement-retour.js) -->
+    <a-entity id="rig" movement-controls="fly: false; speed: 0.15; enabled: true"
+      gestion-mouvement="boutonRetour: #btn-retour"
       position="0 0 0">
 
       <!--
