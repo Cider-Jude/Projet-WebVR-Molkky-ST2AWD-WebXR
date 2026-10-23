@@ -70,6 +70,10 @@ var GestionSons = (function () {
 
 (function () {
     var scene = document.querySelector('a-scene');
+    scene.addEventListener('baton-touche-quille', function (e) {
+        console.log('Choc sur la quille ' + e.detail.numero );
+        // plus tard : jouer le son ici
+    });
 
 
     scene.addEventListener('partie-demarree', function () {

@@ -742,6 +742,46 @@ AFRAME.registerComponent('baton', {
     }
 });
 
+AFRAME.registerComponent('choc-baton', {
+    schema: {
+        vitesseMin: { default: 0.3 },    // m/s : en dessous, c'est un simple contact (pas d'événement)
+        delai: { default: 120 }          // ms mini entre deux chocs avec la même quille
+    },
+
+    init: function () {
+        this.derniers = new Map();       // quille -> instant du dernier choc
+        this.surCollision = this.surCollision.bind(this);
+        this.el.addEventListener('collide', this.surCollision);
+    },
+
+    surCollision: function (evt) {
+        var d = evt.detail;
+        var autre = d.body && d.body.el;
+        if (!autre || !autre.classList.contains('quille')) { return; }   // on ne garde que les quilles
+
+        // vitesse d'impact le long de la normale du contact (m/s). Lue tout de suite :
+        // cannon réutilise le même objet d'événement pour les collisions suivantes.
+        var vitesse = d.contact ? Math.abs(d.contact.getImpactVelocityAlongNormal()) : 0;
+        if (vitesse < this.data.vitesseMin) { return; }
+
+        var maintenant = performance.now();
+        if (maintenant - (this.derniers.get(autre) || 0) < this.data.delai) { return; }   // anti-rafale
+        this.derniers.set(autre, maintenant);
+
+        var detail = {
+            quille: autre,
+            numero: autre.components.quille ? autre.components.quille.data.numero : 0,
+            vitesse: vitesse,
+            position: autre.object3D.getWorldPosition(new THREE.Vector3())
+        };
+        autre.emit('touche-par-baton', detail);                      // sur la quille touchée
+        this.el.sceneEl.emit('baton-touche-quille', detail);         // sur la scène (écoute globale)
+    },
+
+    remove: function () {
+        this.el.removeEventListener('collide', this.surCollision);
+    }
+});
 
 /* ==========================================================================
     Composant `commandes-bureau`
